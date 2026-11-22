@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 终端需要读写设备上的任意目录：申请「所有文件访问」权限，由
+         permission_handler 在启动时检查并拉起系统授权页面。 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+
     <application
         android:label="t"
         android:name="${applicationName}"

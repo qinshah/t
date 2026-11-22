@@ -16,6 +16,7 @@ dependencies:
     path: third/ghostty_dart/packages/ghostty_dart_flutter
   panes: ^1.6.0
   path_provider: ^2.1.6
+  permission_handler: ^13.0.2
   provider: ^6.1.5
 
 # ghostty_dart_flutter 的托管约束指向 pub.dev 上的 ghostty_dart，

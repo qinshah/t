@@ -97,12 +97,17 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _provider,
-      builder: (context, _) {
-        final wide = MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
-        return wide ? _buildWide(context) : _buildNarrow(context);
-      },
+    // 返回键不退出应用；抽屉、对话框属于独立路由，返回仍会先关闭它们。
+    return PopScope(
+      canPop: false,
+      child: ListenableBuilder(
+        listenable: _provider,
+        builder: (context, _) {
+          final wide =
+              MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
+          return wide ? _buildWide(context) : _buildNarrow(context);
+        },
+      ),
     );
   }
 

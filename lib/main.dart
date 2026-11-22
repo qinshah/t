@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:ghostty_dart/ghostty_dart.dart' show setVtPngDecoder;
 import 'package:ghostty_dart_flutter/ghostty_dart_flutter.dart'
     show decodeVtPng;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
@@ -32,6 +34,9 @@ Future<void> main() async {
       child: const TerminalApp(),
     ),
   );
+
+  // 界面起来后再申请，权限弹窗/系统设置页不会挡住启动。
+  unawaited(_requestAllFilesAccessOnce());
 }
 
 /// 把工作目录切到 app bundle 的 `Contents/Frameworks`。
@@ -46,5 +51,20 @@ void _enterMacosFrameworkDirectory() {
   final frameworks = Directory('${contentsDir.path}/Frameworks');
   if (frameworks.existsSync()) {
     Directory.current = frameworks;
+  }
+}
+
+/// 检查并申请一次「所有文件访问」权限，仅 Android。
+///
+/// 终端要读写设备上的任意目录，需要 `MANAGE_EXTERNAL_STORAGE`（Android 11+）。
+/// 已授权时直接返回；未授权时交给 permission_handler 拉起系统授权页面，
+/// 只申请一次，不反复打扰。权限失败不影响应用启动。
+Future<void> _requestAllFilesAccessOnce() async {
+  if (!Platform.isAndroid) return;
+  try {
+    if (await Permission.manageExternalStorage.isGranted) return;
+    await Permission.manageExternalStorage.request();
+  } catch (error) {
+    debugPrint('权限申请失败：$error');
   }
 }
