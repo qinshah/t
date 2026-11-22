@@ -1,0 +1,215 @@
+name: Release
+
+# 两种触发方式：
+# 1. 推送 v* tag（推荐）：release 用该 tag；
+# 2. 手动 workflow_dispatch：tag 输入留空时使用仓库最新 tag（无 tag 则报错）。
+# 发版前必须先把 pubspec.yaml 的 version 改成与 tag 一致（如 v0.2.0 ↔ 0.2.0+2），
+# prepare job 会校验，不一致时直接失败，避免应用内检查更新拿到的版本号错位。
+# 构建产物：Android APK / Windows zip / macOS zip，汇总后发草稿 release。
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag（留空 = 最新 git tag）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write # gh release create 需要写权限
+
+env:
+  FLUTTER_VERSION: "3.47.3"
+  # pubspec.lock 由国内镜像生成；固定同一镜像，避免 hosted URL 不一致触发重新解析。
+  PUB_HOSTED_URL: "https://pub.flutter-io.cn"
+
+jobs:
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      ref: ${{ steps.meta.outputs.ref }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 需要完整历史与 tag
+
+      - name: Resolve tag and verify pubspec version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG="$GITHUB_REF_NAME"
+            REF="$GITHUB_SHA"
+          else
+            TAG="${{ inputs.tag }}"
+            if [ -z "$TAG" ]; then
+              TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+            fi
+            if [ -z "$TAG" ]; then
+              echo "::error::仓库没有任何 tag，且未在输入中指定 tag。请先打 tag 或手动填写。"
+              exit 1
+            fi
+            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+              REF="$(git rev-parse "$TAG^{commit}")"
+            else
+              REF="$GITHUB_SHA"
+            fi
+          fi
+
+          # pubspec 的 version 形如 0.1.0+1；Release tag 必须是 v0.1.0。
+          VERSION="$(git show "$REF:pubspec.yaml" \
+            | sed -n 's/^version:[[:space:]]*//p' | head -n1 \
+            | cut -d+ -f1 | tr -d '[:space:]')"
+          if [ -z "$VERSION" ]; then
+            echo "::error::pubspec.yaml 中没有版本号。"
+            exit 1
+          fi
+          if [ "${TAG#v}" != "$VERSION" ]; then
+            echo "::error::tag $TAG 与 pubspec.yaml 版本 $VERSION 不一致：请先修改 pubspec.yaml 的 version 再打 tag。"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "准备发布 $TAG（pubspec $VERSION）@ $REF"
+
+  android:
+    name: Build Android APK
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          submodules: recursive # third/ghostty_dart 是终端引擎子模块
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+  windows:
+    name: Build Windows zip
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          submodules: recursive
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter build windows --release
+
+      # 打包整个 Release 目录（exe + dll + data 缺一不可）
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: build/windows/x64/runner/Release/
+          if-no-files-found: error
+
+  macos:
+    name: Build macOS zip
+    needs: prepare
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          submodules: recursive
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter build macos --release
+
+      - name: Zip app bundle
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r -q "$GITHUB_WORKSPACE/t-macos.zip" *.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-zip
+          path: t-macos.zip
+          if-no-files-found: error
+
+  release:
+    name: Draft release
+    needs: [prepare, android, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          fetch-depth: 0 # 需要完整历史才能判断 tag 是否已存在
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Rename artifacts
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mv artifacts/android-apk/app-release.apk "t-${TAG}-android.apk"
+          cd artifacts/windows-build && zip -r -q "../t-${TAG}-windows.zip" . && cd ../..
+          mv "artifacts/t-${TAG}-windows.zip" .
+          mv artifacts/macos-zip/t-macos.zip "t-${TAG}-macos.zip"
+
+      # tag 已存在 → 在原 tag 上发草稿；不存在 → 在当前 commit 上新建该 tag
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          REF: ${{ needs.prepare.outputs.ref }}
+        run: |
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            TARGET=""
+          else
+            TARGET="--target $REF"
+          fi
+          gh release create "$TAG" $TARGET --draft --generate-notes \
+            --title "t $TAG" \
+            "t-${TAG}-android.apk" \
+            "t-${TAG}-windows.zip" \
+            "t-${TAG}-macos.zip"
