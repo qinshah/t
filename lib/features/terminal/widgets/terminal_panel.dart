@@ -38,22 +38,28 @@ class TerminalPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = session.controller;
-    return ColoredBox(
-      // 与终端自身的背景一致，避免首帧前闪一下 Scaffold 的底色。
-      color: controller.theme.background,
-      child: VtTerminalView(
-        controller: controller,
-        focusNode: session.focusNode,
-        // 所有标签常驻 widget 树（IndexedStack 保活），焦点只能由 provider
-        // 在切换标签时显式授予，否则多个终端会争夺初始焦点。
-        autofocus: false,
-        textStyle: const TextStyle(fontSize: 13),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        cursorStyle: cursorStyle,
-        cursorGlide: cursorGlide,
-        cursorGlideDuration: cursorGlideDuration,
-        barCursorThicknessFraction: barCursorThicknessFraction,
-      ),
+    // 配色可以在运行中切换，底色也要跟着控制器一起重建。
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        return ColoredBox(
+          // 与终端自身的背景一致，避免首帧前闪一下 Scaffold 的底色。
+          color: controller.theme.background,
+          child: VtTerminalView(
+            controller: controller,
+            focusNode: session.focusNode,
+            // 所有标签常驻 widget 树（IndexedStack 保活），焦点只能由 provider
+            // 在切换标签时显式授予，否则多个终端会争夺初始焦点。
+            autofocus: false,
+            textStyle: const TextStyle(fontSize: 13),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            cursorStyle: cursorStyle,
+            cursorGlide: cursorGlide,
+            cursorGlideDuration: cursorGlideDuration,
+            barCursorThicknessFraction: barCursorThicknessFraction,
+          ),
+        );
+      },
     );
   }
 }

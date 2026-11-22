@@ -12,6 +12,9 @@ abstract interface class ITerminalSession {
   /// 该会话专用的焦点节点，由会话自己创建并释放。
   FocusNode get focusNode;
 
+  /// 应用新的终端配色；已存在的屏幕颜色立即更新，不重建会话。
+  void applyTheme(VtTerminalTheme theme);
+
   /// 停止订阅、终止进程并释放全部资源；重复调用必须安全。
   Future<void> dispose();
 }

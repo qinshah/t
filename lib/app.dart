@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:panes/panes.dart';
+import 'package:provider/provider.dart';
 
+import 'features/settings/providers/settings_provider.dart';
 import 'features/terminal/screens/terminal_screen.dart';
 
 /// 应用根组件。
@@ -10,11 +13,17 @@ class TerminalApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 't',
-      debugShowCheckedModeBanner: false,
-      theme: _buildTheme(Brightness.dark),
-      home: const TerminalScreen(),
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        return MaterialApp(
+          title: 't',
+          debugShowCheckedModeBanner: false,
+          theme: _buildTheme(Brightness.light),
+          darkTheme: _buildTheme(Brightness.dark),
+          themeMode: settings.themeMode,
+          home: const TerminalScreen(),
+        );
+      },
     );
   }
 }
@@ -24,9 +33,21 @@ ThemeData _buildTheme(Brightness brightness) {
     seedColor: const Color(0xFF2DD4BF),
     brightness: brightness,
   );
+  final dark = brightness == Brightness.dark;
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    scaffoldBackgroundColor: const Color(0xFF0E1116),
+    scaffoldBackgroundColor: dark
+        ? const Color(0xFF0E1116)
+        : const Color(0xFFF5F6F8),
+    // 侧边栏分隔条跟随主题，避免浅色模式下还是一条深色线。
+    extensions: [
+      PaneThemeData(
+        resizerColor: scheme.outlineVariant.withValues(alpha: 0.55),
+        resizerHoverColor: scheme.primary,
+        resizerFocusedColor: scheme.primary,
+        resizerThickness: 1,
+      ),
+    ],
   );
 }

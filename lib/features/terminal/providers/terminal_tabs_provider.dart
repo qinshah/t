@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:ghostty_dart_flutter/ghostty_dart_flutter.dart'
+    show VtTerminalTheme;
 
 import '../models/terminal_tab.dart';
 import '../services/local_pty_session.dart';
@@ -9,7 +11,10 @@ import '../services/terminal_session.dart';
 /// 创建终端会话的工厂。
 ///
 /// 默认实现是本地 PTY；测试通过构造函数注入假会话。
-typedef TerminalSessionFactory = Future<ITerminalSession> Function();
+/// 参数是创建时的终端配色。
+typedef TerminalSessionFactory = Future<ITerminalSession> Function(
+  VtTerminalTheme theme,
+);
 
 /// 多终端标签的唯一真相来源。
 ///
@@ -19,12 +24,18 @@ class TerminalTabsProvider extends ChangeNotifier {
   /// 创建 provider。
   ///
   /// [createSession] 仅供测试注入假会话；生产不传即为本地 PTY。
-  TerminalTabsProvider({TerminalSessionFactory? createSession})
-    : _createSession =
-          createSession ?? (() async => LocalPtySession.create());
+  /// [theme] 是新会话启动时使用的终端配色。
+  TerminalTabsProvider({
+    TerminalSessionFactory? createSession,
+    VtTerminalTheme theme = VtTerminalTheme.defaultTheme,
+  }) : _createSession =
+           createSession ??
+           ((theme) async => LocalPtySession.create(theme: theme)),
+       _terminalTheme = theme;
 
   final TerminalSessionFactory _createSession;
   final List<TerminalTab> _tabs = <TerminalTab>[];
+  VtTerminalTheme _terminalTheme;
 
   String? _activeId;
   int _counter = 0;
@@ -67,7 +78,7 @@ class TerminalTabsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final session = await _createSession();
+      final session = await _createSession(_terminalTheme);
       if (_disposed) {
         unawaited(session.dispose());
         return;
@@ -123,6 +134,17 @@ class TerminalTabsProvider extends ChangeNotifier {
   /// 把焦点交给当前激活标签的终端。
   void focusActiveSession() {
     activeTab?.session.focusNode.requestFocus();
+  }
+
+  /// 应用新的终端配色。
+  ///
+  /// 已打开的会话立即换色；之后新建的会话也会使用该配色。
+  void updateTerminalTheme(VtTerminalTheme theme) {
+    if (_disposed || theme == _terminalTheme) return;
+    _terminalTheme = theme;
+    for (final tab in _tabs) {
+      tab.session.applyTheme(theme);
+    }
   }
 
   /// 等标签内容从 widget 树移除后再释放会话。

@@ -25,7 +25,11 @@ class LocalPtySession implements ITerminalSession {
   /// 创建一个本地 PTY 会话。
   ///
   /// [shell] 仅用于测试注入；生产按平台自动推导。
-  factory LocalPtySession.create({ShellSpec? shell}) {
+  /// [theme] 是启动时的终端配色，之后可通过 [applyTheme] 覆盖。
+  factory LocalPtySession.create({
+    ShellSpec? shell,
+    VtTerminalTheme theme = VtTerminalTheme.defaultTheme,
+  }) {
     final spec =
         shell ??
         resolveShellSpec(
@@ -35,6 +39,7 @@ class LocalPtySession implements ITerminalSession {
     final session = LocalPtySession._(shell: spec);
     // 回调在视图开始写数据之后才会触发，此时控制器已经就绪。
     session._controller = VtTerminalController(
+      theme: theme,
       onOutput: session._writeToPty,
       onResize: (cols, rows, pixelWidth, pixelHeight) =>
           session._resize(cols, rows),
@@ -49,6 +54,12 @@ class LocalPtySession implements ITerminalSession {
 
   @override
   final FocusNode focusNode = FocusNode(debugLabel: 'terminal-pty');
+
+  @override
+  void applyTheme(VtTerminalTheme theme) {
+    if (_disposed) return;
+    _controller.theme = theme;
+  }
 
   /// 本次会话用于启动 Shell 的参数。
   final ShellSpec shell;
@@ -121,11 +132,7 @@ class LocalPtySession implements ITerminalSession {
     final original = Directory.current;
     Directory.current = frameworks;
     try {
-      return _spawn(
-        cols,
-        rows,
-        workingDirectory ?? original.path,
-      );
+      return _spawn(cols, rows, workingDirectory ?? original.path);
     } finally {
       Directory.current = original;
     }
