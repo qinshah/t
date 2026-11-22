@@ -1,0 +1,3 @@
+[submodule "third/ghostty_dart"]
+	path = third/ghostty_dart
+	url = https://github.com/AlonsoMCarlos/ghostty_dart

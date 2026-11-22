@@ -1,0 +1,30 @@
+name: t
+description: "A Flutter multi-tab terminal built on libghostty-vt."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_pty_new: ^1.0.0
+  # 终端渲染与 VT 引擎，来自 third/ghostty_dart 子模块。
+  ghostty_dart: any
+  ghostty_dart_flutter:
+    path: third/ghostty_dart/packages/ghostty_dart_flutter
+
+# ghostty_dart_flutter 的托管约束指向 pub.dev 上的 ghostty_dart，
+# 这里统一覆盖到同一个子模块，避免两份不同版本的引擎。
+dependency_overrides:
+  ghostty_dart:
+    path: third/ghostty_dart/packages/ghostty_dart
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
