@@ -1,4 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// 打开与应用菜单“关于”完全一致的对话框。
+///
+/// macOS 原生侧从 Info.plist 组装名称、版本与版权；其他平台没有该通道时
+/// 退回应用内对话框。
+Future<void> openAppAbout(BuildContext context) async {
+  try {
+    await _appMenuChannel.invokeMethod<void>('showAppAbout');
+  } on MissingPluginException {
+    if (!context.mounted) return;
+    await showAppAboutDialog(context, name: 't', version: '');
+  }
+}
+
+const MethodChannel _appMenuChannel = MethodChannel('com.ivi.t/app_menu');
 
 /// 打开“关于”对话框。
 ///

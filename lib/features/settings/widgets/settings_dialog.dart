@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app_breakpoints.dart';
+import '../../about/widgets/about_dialog.dart';
+import '../../terminal/providers/terminal_tabs_provider.dart';
+import '../../terminal/services/image_demo.dart';
 import '../models/setting.dart';
 import '../providers/settings_provider.dart';
 
@@ -127,6 +132,23 @@ class _SettingsBody extends StatelessWidget {
                         onChanged: settings.setQuitWhenLastClosed,
                       ),
                     ),
+                    const Divider(height: 1, indent: 20, endIndent: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
+                          TextButton(
+                            onPressed: () =>
+                                unawaited(_runImageRenderTest(context)),
+                            child: const Text('图片渲染测试'),
+                          ),
+                          TextButton(
+                            onPressed: () => unawaited(openAppAbout(context)),
+                            child: const Text('关于 t'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -135,6 +157,23 @@ class _SettingsBody extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+/// 新开一个普通终端标签，并往里面插入 Kitty 图片动画。
+Future<void> _runImageRenderTest(BuildContext context) async {
+  final tabs = context.read<TerminalTabsProvider>();
+  // 先关掉设置，新标签在覆盖层后面才看得见。
+  Navigator.of(context, rootNavigator: true).pop();
+
+  await tabs.createTab();
+  final session = tabs.activeTab?.session;
+  if (tabs.lastError != null || session == null) return;
+
+  try {
+    await playImageDemo(session.controller);
+  } catch (error, stackTrace) {
+    debugPrint('图片渲染测试失败: $error\n$stackTrace');
   }
 }
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:panes/panes.dart';
@@ -27,12 +26,7 @@ const double _sidebarMaxWidth = 420;
 /// 的抽屉。两种布局共享同一份标签状态，切换窗口宽度不会中断任何终端会话。
 class TerminalScreen extends StatefulWidget {
   /// 创建终端工作区。
-  ///
-  /// [createSession] 仅用于测试注入假会话；生产不传，默认创建本地 PTY。
-  const TerminalScreen({super.key, this.createSession});
-
-  /// 会话工厂，默认 `LocalPtySession.create`。
-  final TerminalSessionFactory? createSession;
+  const TerminalScreen({super.key});
 
   @override
   State<TerminalScreen> createState() => _TerminalScreenState();
@@ -53,14 +47,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
   void initState() {
     super.initState();
     _settings = context.read<SettingsProvider>();
-    _provider = TerminalTabsProvider(
-      createSession: widget.createSession,
-      theme: _settings.terminalThemeFor(_appBrightness),
-      // 关闭最后一个终端后，按偏好决定是否退出应用。
-      onLastTabClosed: () {
-        if (_settings.quitWhenLastClosed) exit(0);
-      },
-    );
+    // 标签状态由应用层持有，设置等覆盖层也能访问。
+    _provider = context.read<TerminalTabsProvider>();
     _panes = PaneController(
       entries: [
         PaneEntry(
@@ -90,7 +78,6 @@ class _TerminalScreenState extends State<TerminalScreen> {
   void dispose() {
     _settings.removeListener(_syncTerminalTheme);
     _panes.dispose();
-    _provider.dispose();
     super.dispose();
   }
 

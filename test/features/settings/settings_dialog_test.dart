@@ -41,7 +41,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('宽屏使用不占满的对话框，并展示三个配置项', (tester) async {
+  testWidgets('宽屏使用不占满的对话框，并展示配置项与入口', (tester) async {
     await tester.pumpWidget(host());
     await openDialog(tester);
 
@@ -49,6 +49,8 @@ void main() {
     expect(find.text('终端深色模式'), findsOneWidget);
     expect(find.text('自动退出'), findsOneWidget);
     expect(find.text('终端配色'), findsNothing);
+    expect(find.text('图片渲染测试'), findsOneWidget);
+    expect(find.text('关于 t'), findsOneWidget);
     expect(find.byType(Dialog), findsOneWidget);
     // 宽屏对话框有最大尺寸约束，不是零内边距。
     expect(tester.widget<Dialog>(find.byType(Dialog)).insetPadding, isNull);

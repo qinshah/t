@@ -25,6 +25,9 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationDidFinishLaunching(_ notification: Notification) {
     super.applicationDidFinishLaunching(notification)
 
+    // 提前建好通道并注册处理器，Dart 侧的 getAppInfo 才能拿到响应。
+    _ = menuChannel()
+
     // macOS 13 起系统把 “Preferences…” 更名为 “Settings…”。
     if #available(macOS 13.0, *),
        let appMenu = NSApp.mainMenu?.items.first?.submenu {
@@ -32,18 +35,39 @@ class AppDelegate: FlutterAppDelegate {
     }
   }
 
-  /// 把 macOS 菜单事件转发给 Flutter。
-  private func sendAppMenu(_ method: String, arguments: Any? = nil) {
-    guard let controller = NSApp.windows
-      .compactMap({ $0.contentViewController as? FlutterViewController })
-      .first else { return }
+  /// 当前窗口的 Flutter 视图控制器。
+  private var flutterViewController: FlutterViewController? {
+    NSApp.windows
+      .compactMap { $0.contentViewController as? FlutterViewController }
+      .first
+  }
 
-    let channel = appMenuChannel ?? FlutterMethodChannel(
+  /// 取回（或首次创建）与 Flutter 通信的通道。
+  private func menuChannel() -> FlutterMethodChannel? {
+    if let channel = appMenuChannel { return channel }
+    guard let controller = flutterViewController else { return nil }
+
+    let channel = FlutterMethodChannel(
       name: Self.appMenuChannelName,
       binaryMessenger: controller.engine.binaryMessenger
     )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "showAppAbout":
+        // 设置页的“关于”与应用菜单共用同一条路径。
+        self.showAppAbout(nil)
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
     appMenuChannel = channel
-    channel.invokeMethod(method, arguments: arguments)
+    return channel
+  }
+
+  /// 把 macOS 菜单事件转发给 Flutter。
+  private func sendAppMenu(_ method: String, arguments: Any? = nil) {
+    menuChannel()?.invokeMethod(method, arguments: arguments)
   }
 
   /// 响应应用菜单里的 “Settings…”（⌘,）。
