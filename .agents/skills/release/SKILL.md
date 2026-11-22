@@ -44,8 +44,11 @@ curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_m
   不足时才升级，并在本地重新验证。
 - 升级 Flutter 版本后先本地 `flutter pub get`、`flutter analyze`、
   `flutter test`，再发版。
-- Android 只打 64 位包：`android/app/build.gradle.kts` 的 `abiFilters` 限定
-  `arm64-v8a` / `x86_64`，构建命令必须带 `--split-per-abi`。
+- Android 只打 64 位包：构建命令必须是
+  `flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64`。
+  **不要在 Gradle 里配 `ndk.abiFilters`**：它与 `--split-per-abi` 的 ABI
+  splits 互斥，会报 `Conflicting configuration ... cannot be present when
+  splits abi filters are set`。
 
 ## 发版步骤
 
@@ -119,7 +122,7 @@ t-v0.2.0-macos.zip
 Android 构建命令固定为：
 
 ```bash
-flutter build apk --release --split-per-abi
+flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64
 ```
 
 只产出 `arm64-v8a` 与 `x86_64`，不要改回单 APK；应用检查更新时会按设备
@@ -143,8 +146,13 @@ gh release list --repo qinshah/t --limit 3
   version Y`**：按错误提示升级 `android/settings.gradle.kts` 的
   `com.android.application`，并在本地重新构建验证；Flutter 版本回退到本地
   已验证版本时，AGP 也一并回退。
+- **`Conflicting configuration : '...' in ndk abiFilters cannot be present
+  when splits abi filters are set`**：Gradle 的 `ndk.abiFilters` 与
+  `--split-per-abi` 互斥。删掉 `ndk.abiFilters`，只用
+  `--target-platform android-arm64,android-x64` 限制 ABI。
 - 改完重新提交、重新打 tag 触发构建；本地可先跑
-  `flutter build apk --release --split-per-abi` 验证。
+  `flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64`
+  验证。
 
 ## 注意事项
 

@@ -63,8 +63,8 @@ flutter build macos      # 生产构建
 - 发版：修改 `pubspec.yaml` 的 `version` → 提交 → 打 `vX.Y.Z` tag → 推送。
   [release.yml](.github/workflows/release.yml) 会构建 Android APK、Windows
   zip、macOS zip 并创建草稿 Release。Android 使用
-  `flutter build apk --release --split-per-abi`，只产出 `arm64-v8a` 与
-  `x86_64` 两个安装包，应用按设备 ABI 选择下载。
+  `--split-per-abi --target-platform android-arm64,android-x64`，只产出
+  `arm64-v8a` 与 `x86_64` 两个安装包，应用按设备 ABI 选择下载。
 - tag 必须与 pubspec 版本一致（CI 的 `prepare` job 会校验）；草稿 Release
   转为正式版后应用才能检查到：
   `gh release edit vX.Y.Z --draft=false --latest`。
@@ -94,8 +94,10 @@ path 依赖会与它冲突；因此根 `pubspec.yaml` 用 `dependency_overrides`
 - **Android release 清单声明了 `INTERNET`**：检查更新需要访问 GitHub API。
   debug / profile 清单自带的 `INTERNET` 不会合并进 release，新增网络功能时
   要记得在 `android/app/src/main/AndroidManifest.xml` 声明。
-- **Android 只打 64 位包**：`abiFilters` 限定 `arm64-v8a` 与 `x86_64`，
-  构建使用 `--split-per-abi`，Release 里没有 armeabi-v7a 安装包。
+- **Android 只打 64 位包**：构建使用
+  `flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64`，
+  只产出 `arm64-v8a` 与 `x86_64`，Release 里没有 armeabi-v7a 安装包。
+  不要在 Gradle 里再配 `ndk.abiFilters`，它与 `--split-per-abi` 互斥。
 - **macOS 部署目标为 12.0**：`macos/Podfile` 的 `platform :osx, '12.0'` 与
   Xcode 工程一致；改这个值前先确认 Xcode 支持的最低版本。
 - **macOS 启动时会把工作目录切到 app bundle 的 `Contents/Frameworks`**：

@@ -264,8 +264,10 @@ dart pub create -t package [package_name]
   `t-vX.Y.Z-android-<abi>.apk`，`abi` 只有 `arm64-v8a` / `x86_64`；桌面为
   `-windows.zip` / `-macos.zip`），用系统浏览器打开；没有匹配资产时打开
   Release 页面。Android 通过 `device_info_plus` 读取设备 ABI。
-- Android 构建固定 `flutter build apk --release --split-per-abi`，
-  `android/app/build.gradle.kts` 的 `abiFilters` 只保留上述两个 ABI。
+- Android 构建固定
+  `flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64`，
+  只产出 `arm64-v8a` / `x86_64`。**不要配 `ndk.abiFilters`**：它会与
+  `--split-per-abi` 的 ABI splits 冲突，导致 Gradle 配置阶段直接失败。
 - release 清单必须声明 `android.permission.INTERNET`，debug/profile 清单里的
   声明不会合并进正式包。
 - 发版由 `.github/workflows/release.yml` 驱动：推送 `vX.Y.Z` tag 触发构建。
