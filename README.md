@@ -22,7 +22,7 @@ Ghostty 的终端引擎）负责解析与渲染，**flutter_pty_new** 负责本�
 - macOS 12 或更高（工程部署目标为 12.0）。
 - Flutter 3.47 或更高（`ghostty_dart_flutter` 要求 `flutter >= 3.47.0`、
   `sdk ^3.13.5`；本机使用 mise 管理的 oh-3.47.7 版本，CI 使用官方
-  3.47.3 stable）。
+  3.50.1 stable，自带 Dart 3.13.5）。
 - Xcode 命令行工具（构建 macOS 目标需要）。
 - 首次 `flutter pub get` / 构建需要网络：`ghostty_dart` 的 build hook 会下载
   按 sha256 固定的预编译 libghostty-vt 动态库。

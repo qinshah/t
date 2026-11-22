@@ -17,6 +17,26 @@ description: t 项目（Flutter 多标签终端）的发版流程：修改 pubsp
 - `pubspec.yaml` 的 `version: 0.1.0+1` → tag 必须是 `v0.1.0`（`+1` 为构建号，不参与比较）。
 - workflow 的 `prepare` job 会校验两者，不一致直接失败。
 
+## 关键约定：CI 的 Flutter 版本必须满足 pubspec 的 SDK 约束
+
+改 workflow 或升级依赖前，先核对两条约束：
+
+```bash
+sed -n '/^environment:/,/^[^ ]/p' pubspec.yaml   # sdk 约束，当前 ^3.13.5
+flutter --version                                # 本地 Flutter / Dart 版本
+```
+
+- workflow 的 `FLUTTER_VERSION` 自带 Dart 必须满足 `environment.sdk`，同时满足
+  `ghostty_dart_flutter` 的 `flutter >= 3.47.0`，取两者较高者。
+- 已知对应关系：Flutter 3.47.3 → Dart 3.13.3（**不满足** `^3.13.5`）；
+  Flutter 3.50.1 → Dart 3.13.5。当前固定 **3.50.1**。
+- 只升 Flutter、不要为了过 CI 调低 pubspec 的 SDK 约束。
+- CI 日志出现 `The current Dart SDK version is ... Because t requires SDK
+  version ^X, version solving failed`，就是 Flutter 版本不够：先改
+  `FLUTTER_VERSION`，再重跑。
+- 升级 Flutter 版本后先本地 `flutter pub get`、`flutter analyze`、
+  `flutter test`，再发版。
+
 ## 发版步骤
 
 ### 1. 确定新版本号
@@ -99,6 +119,7 @@ gh release list --repo qinshah/t --limit 3
 - CI 用 `submodules: recursive` 拉取 `third/ghostty_dart`，子模块改动需先推到
   `qinshah/ghostty_dart`。
 - `PUB_HOSTED_URL` 固定为 `https://pub.flutter-io.cn`，与 `pubspec.lock` 生成环境一致。
-- Flutter 版本固定在 workflow 的 `FLUTTER_VERSION`（当前 3.47.3），
-  项目要求 `>= 3.47.0`。
+- Flutter 版本固定在 workflow 的 `FLUTTER_VERSION`（当前 3.50.1），
+  必须满足 `pubspec.yaml` 的 `sdk ^3.13.5` 与 `ghostty_dart_flutter` 的
+  `flutter >= 3.47.0`。
 - 只有正式（非 draft、非 prerelease）Release 会被应用内检查更新看到。

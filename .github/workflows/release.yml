@@ -21,7 +21,11 @@ permissions:
   contents: write # gh release create 需要写权限
 
 env:
-  FLUTTER_VERSION: "3.47.3"
+  # Flutter 版本必须同时满足：
+  # - pubspec.yaml 的 environment.sdk（当前 ^3.13.5）；
+  # - ghostty_dart_flutter 的 flutter >= 3.47.0。
+  # 3.47.3 自带 Dart 3.13.3，解析 ^3.13.5 会失败；3.50.1 自带 Dart 3.13.5。
+  FLUTTER_VERSION: "3.50.1"
   # pubspec.lock 由国内镜像生成；固定同一镜像，避免 hosted URL 不一致触发重新解析。
   PUB_HOSTED_URL: "https://pub.flutter-io.cn"
 
@@ -102,6 +106,9 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
+      - name: Show Flutter and Dart versions
+        run: flutter --version
+
       - run: flutter pub get
 
       - run: flutter build apk --release
@@ -128,6 +135,9 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+
+      - name: Show Flutter and Dart versions
+        run: flutter --version
 
       - run: flutter pub get
 
@@ -156,6 +166,9 @@ jobs:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+
+      - name: Show Flutter and Dart versions
+        run: flutter --version
 
       - run: flutter pub get
 
