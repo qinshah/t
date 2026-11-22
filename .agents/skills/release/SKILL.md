@@ -31,6 +31,9 @@ flutter --version                                # 本地 Flutter / Dart 版本
 - 已知对应关系：Flutter 3.47.3 → Dart 3.13.3（**不满足** `^3.13.5`）；
   Flutter 3.50.1 → Dart 3.13.5。当前固定 **3.50.1**。
 - 只升 Flutter、不要为了过 CI 调低 pubspec 的 SDK 约束。
+- Android 还有独立的最低工具链版本：Flutter 3.50.1 要求 AGP ≥ 9.1.1
+  （`android/settings.gradle.kts` 的 `com.android.application`），并保持
+  `android/gradle/wrapper` 的 Gradle 版本兼容。
 - CI 日志出现 `The current Dart SDK version is ... Because t requires SDK
   version ^X, version solving failed`，就是 Flutter 版本不够：先改
   `FLUTTER_VERSION`，再重跑。
@@ -112,6 +115,16 @@ t-v0.2.0-macos.zip
 gh release edit v0.2.0 --repo qinshah/t --draft=false --latest
 gh release list --repo qinshah/t --limit 3
 ```
+
+## 版本不匹配排查
+
+- **`Because t requires SDK version ^X, version solving failed`**：CI 的
+  Flutter 自带 Dart 低于 pubspec 要求，升级 `FLUTTER_VERSION`。
+- **`Android Gradle Plugin version X is lower than Flutter's minimum supported
+  version Y`**：升级 `android/settings.gradle.kts` 的 `com.android.application`
+  到要求的最低版本（3.50.1 需要 ≥ 9.1.1），并确认 Gradle wrapper 兼容。
+- 改完重新提交、重新打 tag 触发构建；本地可先跑
+  `flutter build apk --release` 验证。
 
 ## 注意事项
 
