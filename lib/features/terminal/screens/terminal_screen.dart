@@ -1,21 +1,29 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:panes/panes.dart';
+import 'package:provider/provider.dart';
 
+import '../../../app_breakpoints.dart';
+import '../../settings/providers/settings_provider.dart';
+import '../../settings/widgets/settings_dialog.dart';
 import '../providers/terminal_tabs_provider.dart';
 import '../widgets/terminal_panel.dart';
 import '../widgets/terminal_sidebar.dart';
 
-/// 侧边栏与抽屉的切换断点：宽于它用常驻侧边栏，否则收进抽屉。
-const double _sidebarBreakpoint = 900;
+/// 侧边栏初始宽度，也是窄屏抽屉宽度。
+const double _sidebarInitialWidth = 264;
 
-/// 侧边栏宽度。
-const double _sidebarWidth = 264;
+/// 侧边栏可拖动的最小宽度。
+const double _sidebarMinWidth = 200;
+
+/// 侧边栏可拖动的最大宽度。
+const double _sidebarMaxWidth = 420;
 
 /// 多终端工作区。
 ///
-/// 宽屏时标签列表常驻左侧，窄屏时收进 AppBar 的抽屉；两种布局共享同一份
-/// 标签状态，切换窗口宽度不会中断任何终端会话。
+/// 宽屏时标签列表常驻左侧，且可以通过分隔条拖动调宽；窄屏时收进 AppBar
+/// 的抽屉。两种布局共享同一份标签状态，切换窗口宽度不会中断任何终端会话。
 class TerminalScreen extends StatefulWidget {
   /// 创建终端工作区。
   ///
@@ -30,20 +38,69 @@ class TerminalScreen extends StatefulWidget {
 }
 
 class _TerminalScreenState extends State<TerminalScreen> {
+  late final SettingsProvider _settings;
   late final TerminalTabsProvider _provider;
+
+  /// 宽屏侧边栏与内容区的分栏控制器；窄屏时不渲染但保留宽度状态。
+  late final PaneController _panes;
+
+  /// 当前应用主题的实际亮度；`随颜色` 时终端据此选深浅。
+  Brightness _appBrightness =
+      WidgetsBinding.instance.platformDispatcher.platformBrightness;
 
   @override
   void initState() {
     super.initState();
-    _provider = TerminalTabsProvider(createSession: widget.createSession);
+    _settings = context.read<SettingsProvider>();
+    _provider = TerminalTabsProvider(
+      createSession: widget.createSession,
+      theme: _settings.terminalThemeFor(_appBrightness),
+    );
+    _panes = PaneController(
+      entries: [
+        PaneEntry(
+          id: 'sidebar',
+          initialSize: PaneSize.pixel(_sidebarInitialWidth),
+          minSize: PaneSize.pixel(_sidebarMinWidth),
+          maxSize: PaneSize.pixel(_sidebarMaxWidth),
+        ),
+        PaneEntry(id: 'content', initialSize: PaneSize.fraction(1)),
+      ],
+    );
+    _settings.addListener(_syncTerminalTheme);
     // 启动即创建首个标签；焦点由 provider 在标签建好后授予。
     unawaited(_provider.createTab());
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 跟随的是应用主题解析后的深浅色，而不是裸的系统亮度：
+    // 颜色模式为深/浅时，MaterialApp 的实际主题就是对应的亮度。
+    _appBrightness = Theme.of(context).brightness;
+    _syncTerminalTheme();
+  }
+
+  @override
   void dispose() {
+    _settings.removeListener(_syncTerminalTheme);
+    _panes.dispose();
     _provider.dispose();
     super.dispose();
+  }
+
+  /// 偏好或应用主题深浅变化时，同步到所有已打开的会话。
+  void _syncTerminalTheme() {
+    _provider.updateTerminalTheme(_settings.terminalThemeFor(_appBrightness));
+  }
+
+  void _createTab() {
+    if (_provider.isCreating) return;
+    unawaited(_provider.createTab());
+  }
+
+  void _openSettings() {
+    unawaited(showSettingsDialog<void>(context));
   }
 
   @override
@@ -51,32 +108,27 @@ class _TerminalScreenState extends State<TerminalScreen> {
     return ListenableBuilder(
       listenable: _provider,
       builder: (context, _) {
-        final wide =
-            MediaQuery.sizeOf(context).width >= _sidebarBreakpoint;
+        final wide = MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
         return wide ? _buildWide(context) : _buildNarrow(context);
       },
     );
   }
 
   Widget _buildWide(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: Row(
-        children: [
-          SizedBox(
-            width: _sidebarWidth,
-            child: TerminalSidebar(
-              provider: _provider,
-              onTabSelected: _provider.selectTab,
-            ),
+      body: MultiPane(
+        direction: Axis.horizontal,
+        controller: _panes,
+        paneBuilder: (context, id, animationProgress) => switch (id) {
+          'sidebar' => TerminalSidebar(
+            provider: _provider,
+            showHeaderActions: true,
+            onTabSelected: _provider.selectTab,
+            onNewTab: _createTab,
+            onOpenSettings: _openSettings,
           ),
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: scheme.outlineVariant.withValues(alpha: 0.4),
-          ),
-          Expanded(child: _Workspace(provider: _provider)),
-        ],
+          _ => _Workspace(provider: _provider),
+        },
       ),
     );
   }
@@ -87,23 +139,25 @@ class _TerminalScreenState extends State<TerminalScreen> {
         title: Text(_provider.activeTab?.title ?? '终端'),
         actions: [
           IconButton(
-            onPressed: _provider.isCreating
-                ? null
-                : () => unawaited(_provider.createTab()),
+            onPressed: _provider.isCreating ? null : _createTab,
             icon: const Icon(Icons.add),
             tooltip: '新建终端',
+          ),
+          IconButton(
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: '设置',
           ),
         ],
       ),
       drawer: Drawer(
-        width: _sidebarWidth,
+        width: _sidebarInitialWidth,
         child: TerminalSidebar(
           provider: _provider,
           onTabSelected: (id) {
             _provider.selectTab(id);
             Navigator.of(context).pop();
           },
-          onNewTab: () => Navigator.of(context).pop(),
         ),
       ),
       body: _Workspace(provider: _provider),
@@ -149,7 +203,7 @@ class _EmptyState extends StatelessWidget {
     final error = provider.lastError;
 
     return ColoredBox(
-      color: const Color(0xFF0E1116),
+      color: theme.scaffoldBackgroundColor,
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -158,11 +212,7 @@ class _EmptyState extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.terminal,
-                  size: 48,
-                  color: scheme.onSurfaceVariant,
-                ),
+                Icon(Icons.terminal, size: 48, color: scheme.onSurfaceVariant),
                 const SizedBox(height: 16),
                 Text(
                   error == null ? '没有打开的终端' : '终端引擎启动失败',

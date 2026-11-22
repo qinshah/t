@@ -16,6 +16,8 @@ class TerminalSidebar extends StatelessWidget {
     required this.provider,
     this.onTabSelected,
     this.onNewTab,
+    this.showHeaderActions = false,
+    this.onOpenSettings,
   });
 
   /// 标签与会话的唯一来源。
@@ -27,6 +29,15 @@ class TerminalSidebar extends StatelessWidget {
   /// 新建标签之后的回调；窄屏用它关闭抽屉。
   final VoidCallback? onNewTab;
 
+  /// 是否在头部右侧显示「新建终端 / 设置」。
+  ///
+  /// 宽屏常驻侧边栏为 `true`；抽屉顶部已有 AppBar 提供同样的按钮，
+  /// 因此窄屏传 `false`，避免重复。
+  final bool showHeaderActions;
+
+  /// 打开设置；由宽屏侧边栏头部按钮触发。
+  final VoidCallback? onOpenSettings;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -34,14 +45,14 @@ class TerminalSidebar extends StatelessWidget {
     final tabs = provider.tabs;
 
     return Material(
-      color: const Color(0xFF12151B),
+      color: scheme.surfaceContainer,
       child: SafeArea(
         right: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 18, 8, 12),
               child: Row(
                 children: [
                   Icon(Icons.terminal, size: 20, color: scheme.primary),
@@ -59,6 +70,31 @@ class TerminalSidebar extends StatelessWidget {
                       color: scheme.onSurfaceVariant,
                     ),
                   ),
+                  if (showHeaderActions) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      onPressed: provider.isCreating
+                          ? null
+                          : () {
+                              unawaited(provider.createTab());
+                              onNewTab?.call();
+                            },
+                      icon: provider.isCreating
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add, size: 20),
+                      tooltip: '新建终端',
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    IconButton(
+                      onPressed: onOpenSettings,
+                      icon: const Icon(Icons.settings_outlined, size: 20),
+                      tooltip: '设置',
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -85,24 +121,6 @@ class TerminalSidebar extends StatelessWidget {
                         );
                       },
                     ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: FilledButton.tonalIcon(
-                onPressed: provider.isCreating
-                    ? null
-                    : () {
-                        unawaited(provider.createTab());
-                        onNewTab?.call();
-                      },
-                icon: provider.isCreating
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add, size: 18),
-                label: const Text('新建终端'),
-              ),
             ),
           ],
         ),
@@ -141,7 +159,12 @@ class _TabTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+            padding: const EdgeInsets.only(
+              left: 10,
+              right: 4,
+              top: 4,
+              bottom: 4,
+            ),
             child: Row(
               children: [
                 Icon(Icons.terminal, size: 16, color: foreground),
