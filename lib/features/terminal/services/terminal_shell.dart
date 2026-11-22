@@ -47,10 +47,7 @@ ShellSpec resolveShellSpec({
   bool Function(String path)? fileExists,
   bool Function(String path)? directoryExists,
 }) {
-  final fs = _FsProbe(
-    fileExists: fileExists,
-    directoryExists: directoryExists,
-  );
+  final fs = _FsProbe(fileExists: fileExists, directoryExists: directoryExists);
   return switch (operatingSystem) {
     'windows' => _windowsShell(environment, fs),
     'android' => _androidShell(environment, fs),
@@ -106,7 +103,7 @@ ShellSpec _androidShell(Map<String, String> env, _FsProbe fs) {
         ]) ??
         '/system/bin/sh',
     workingDirectory: home,
-    environment: {'HOME': ?home},
+    environment: {..._termEnvironment(env), 'HOME': ?home},
   );
 }
 
@@ -121,7 +118,19 @@ ShellSpec _posixShell(
         '/bin/sh',
     arguments: login ? const ['-l'] : const [],
     workingDirectory: fs.firstDirectory([env['HOME']]),
+    environment: _termEnvironment(env),
   );
+}
+
+/// 父进程环境缺少 `TERM` 时补一个 `xterm-256color`。
+///
+/// `flutter_pty_new` 内部也会兜底设置 `TERM`，但那是插件的隐式行为；
+/// 在 `ShellSpec` 里显式给出后，颜色相关行为可以单测，也方便未来替换
+/// PTY 后端时保持一致。已有非空 `TERM` 时不覆盖。
+Map<String, String> _termEnvironment(Map<String, String> env) {
+  final term = env['TERM'];
+  if (term != null && term.isNotEmpty) return const {};
+  return const {'TERM': 'xterm-256color'};
 }
 
 /// 存在性探测，缺省走真实文件系统，测试可注入。
@@ -135,8 +144,10 @@ class _FsProbe {
   final bool Function(String path) fileExists;
   final bool Function(String path) directoryExists;
 
-  String? firstFile(Iterable<String?> candidates, {bool requireAscii = false}) =>
-      _first(candidates, fileExists, requireAscii: requireAscii);
+  String? firstFile(
+    Iterable<String?> candidates, {
+    bool requireAscii = false,
+  }) => _first(candidates, fileExists, requireAscii: requireAscii);
 
   String? firstDirectory(
     Iterable<String?> candidates, {
