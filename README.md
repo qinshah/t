@@ -13,13 +13,16 @@ Ghostty 的终端引擎）负责解析与渲染，**flutter_pty_new** 负责本�
 - 终端能力来自 libghostty-vt：ANSI / 真彩色、全屏程序（`vim`、`top`）、
   鼠标上报、IME、选择与复制粘贴、Kitty 图形协议（PNG 已接入）。
 - 终端尺寸随窗口/侧边栏变化自动同步给 PTY。
-- 响应式布局：窗口宽度 ≥ 900 时显示常驻侧边栏，否则收进 AppBar 抽屉。
+- 响应式布局：窗口宽度 ≥ 560 时显示常驻侧边栏，否则收进 AppBar 抽屉。
+- 检查更新：启动时静默检查一次 GitHub Release，设置里可手动检查；下载用
+  系统浏览器打开对应平台的安装包。
 
 ## 环境要求
 
 - macOS 12 或更高（工程部署目标为 12.0）。
 - Flutter 3.47 或更高（`ghostty_dart_flutter` 要求 `flutter >= 3.47.0`、
-  `sdk ^3.11.0`；本机使用 mise 管理的 oh-3.47.7 版本）。
+  `sdk ^3.13.5`；本机使用 mise 管理的 oh-3.47.7 版本，CI 使用官方
+  3.47.3 stable）。
 - Xcode 命令行工具（构建 macOS 目标需要）。
 - 首次 `flutter pub get` / 构建需要网络：`ghostty_dart` 的 build hook 会下载
   按 sha256 固定的预编译 libghostty-vt 动态库。
@@ -51,6 +54,21 @@ flutter test             # 单元/Widget 测试
 flutter build macos      # 生产构建
 ```
 
+## 检查更新与发版
+
+- 启动后静默检查一次 GitHub Release；设置对话框里的「检查更新」可手动检查。
+- 本地版本取 `pubspec.yaml` 的 `version`（忽略 `+build` 后缀），与最新 Release
+  的 tag（如 `v0.2.0`）逐段比较；有更新时弹窗，下载按钮用系统浏览器打开
+  当前平台的安装包，没有匹配资产时打开 Release 页面。
+- 发版：修改 `pubspec.yaml` 的 `version` → 提交 → 打 `vX.Y.Z` tag → 推送。
+  [release.yml](.github/workflows/release.yml) 会构建 Android APK、Windows
+  zip、macOS zip 并创建草稿 Release。
+- tag 必须与 pubspec 版本一致（CI 的 `prepare` job 会校验）；草稿 Release
+  转为正式版后应用才能检查到：
+  `gh release edit vX.Y.Z --draft=false --latest`。
+- 仓库还没有 Release 或 GitHub API 限流（未认证 60 次/小时/IP）时，手动检查
+  会提示失败，不影响应用使用。
+
 ## 依赖说明
 
 | 依赖 | 来源 | 作用 |
@@ -58,6 +76,9 @@ flutter build macos      # 生产构建
 | `flutter_pty_new` | pub.dev `^1.0.0` | 创建 PTY、跑本地 Shell |
 | `ghostty_dart_flutter` | `third/ghostty_dart` 子模块 | 终端 widget（渲染、键盘、鼠标、IME） |
 | `ghostty_dart` | 同上（`dependency_overrides` 锁定） | libghostty-vt 的 Dart 绑定 |
+| `http` | pub.dev `^1.6.0` | 请求 GitHub Release API |
+| `package_info_plus` | pub.dev `^10.2.2` | 读取应用版本号 |
+| `url_launcher` | pub.dev `^6.3.3` | 用系统浏览器打开下载链接 |
 
 `ghostty_dart_flutter` 的 pubspec 把 `ghostty_dart` 声明为托管依赖，直接再加
 path 依赖会与它冲突；因此根 `pubspec.yaml` 用 `dependency_overrides` 把
@@ -89,20 +110,29 @@ path 依赖会与它冲突；因此根 `pubspec.yaml` 用 `dependency_overrides`
 ```
 lib/
 ├── main.dart                         # runApp + Kitty PNG 解码钩子
-├── app.dart                          # MaterialApp + 主题
-└── features/terminal/
-    ├── models/terminal_tab.dart      # 标签（id / title / session）
-    ├── providers/
-    │   └── terminal_tabs_provider.dart  # 标签列表、激活项、会话生命周期
-    ├── services/
-    │   ├── terminal_session.dart     # ITerminalSession 接口
-    │   ├── local_pty_session.dart    # PTY ↔ VtTerminalController 接线
-    │   └── terminal_shell.dart       # 按平台推导 Shell 参数
-    ├── screens/
-    │   └── terminal_screen.dart      # 断点式侧边栏 / 抽屉布局
-    └── widgets/
-        ├── terminal_panel.dart       # VtTerminalView 封装 + 光标配置
-        └── terminal_sidebar.dart     # 标签列表与新建/关闭
+├── app.dart                          # MaterialApp + 主题 + 启动检查更新
+├── app_menu.dart                     # macOS 菜单事件分发
+├── app_breakpoints.dart              # 响应式断点
+└── features/
+    ├── about/widgets/about_dialog.dart
+    ├── settings/                     # 偏好项、存储、设置对话框
+    ├── update/                       # 版本比较、GitHub Release 请求、更新弹窗
+    │   ├── models/update_info.dart
+    │   ├── services/update_service.dart
+    │   └── widgets/update_prompt.dart
+    └── terminal/
+        ├── models/terminal_tab.dart      # 标签（id / title / session）
+        ├── providers/
+        │   └── terminal_tabs_provider.dart  # 标签列表、激活项、会话生命周期
+        ├── services/
+        │   ├── terminal_session.dart     # ITerminalSession 接口
+        │   ├── local_pty_session.dart    # PTY ↔ VtTerminalController 接线
+        │   └── terminal_shell.dart       # 按平台推导 Shell 参数
+        ├── screens/
+        │   └── terminal_screen.dart      # 断点式侧边栏 / 抽屉布局
+        └── widgets/
+            ├── terminal_panel.dart       # VtTerminalView 封装 + 光标配置
+            └── terminal_sidebar.dart     # 标签列表与新建/关闭
 third/ghostty_dart/                   # git 子模块（终端引擎与 widget）
 ```
 

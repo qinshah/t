@@ -179,7 +179,9 @@ dart pub create -t package [package_name]
 - **终端引擎：** `third/ghostty_dart` 子模块（`ghostty_dart` + `ghostty_dart_flutter`）
 - **PTY：** pub.dev 上的 `flutter_pty_new ^1.0.0`
 - **其他依赖：** `panes ^1.6.0`（宽屏可拖侧边栏）、`path_provider ^2.1.6`
-  （偏好文件位置）、`provider ^6.1.5`（偏好状态）
+  （偏好文件位置）、`provider ^6.1.5`（偏好状态）、`http ^1.6.0`（GitHub
+  Release API）、`package_info_plus ^10.2.2`（读应用版本）、
+  `url_launcher ^6.3.3`（系统浏览器打开下载链接）
 - **范围：** 应用只提供终端功能，不内置 MCP 服务、driver 入口或调试脚本
 
 ### 响应式布局
@@ -247,6 +249,22 @@ dart pub create -t package [package_name]
   已释放的 `FocusNode` / 控制器。
 - 退出应用时立即终止所有 Shell，避免留下孤儿进程。
 
+### 检查更新与发版
+
+- 更新检查在 `lib/features/update/`：`UpdateService` 请求
+  `api.github.com/repos/qinshah/t/releases/latest`，`compareVersions` 按
+  语义化版本比较（忽略 `v` 前缀与 `+build`）。
+- 启动检查在 `TerminalApp.initState` 的首帧回调；设置里的「检查更新」是手动
+  入口。对话框必须用 `DialogRoute`，不能用 `showDialog`（macOS 会崩）。
+- 下载按平台匹配 Release 资产命名（`t-vX.Y.Z-android.apk` /
+  `-windows.zip` / `-macos.zip`），用系统浏览器打开；没有匹配资产时打开
+  Release 页面。
+- 发版由 `.github/workflows/release.yml` 驱动：推送 `vX.Y.Z` tag 触发构建。
+  tag 必须与 `pubspec.yaml` 的 `version` 一致（CI 会校验），草稿 Release
+  发布后应用才能检查到。
+- 相关技能：`.agents/skills/release/SKILL.md`（发版流程）、
+  `.agents/skills/update-check/SKILL.md`（更新检查实现约束）。
+
 ### 第三方依赖管理
 
 `third/ghostty_dart` 是 **git 子模块**，不是普通目录：
@@ -306,3 +324,50 @@ dart pub create -t package [package_name]
 - 不要在 `build` 里改 `controller.theme`；主题只在会话创建时设置。
 - 复制粘贴快捷键遵循 ghostty 约定（`Ctrl+V` / `Ctrl+A` 属于 Shell），
   不要用 `Shortcuts` 抢占这些组合。
+
+## 提交前规范（AI 开发）
+
+每次准备提交、打 tag 或发版前，按顺序完成下面的检查；不通过就不要提交。
+
+### 1. 代码验证
+
+- `flutter analyze` 无 issue。
+- `flutter test` 全部通过；只改文档时也至少跑一次 `flutter analyze`。
+- 改动 PTY、原生库加载、主题热更新等行为时，额外在 `flutter run -d macos`
+  下实际验证启动、输入输出与退出。
+
+### 2. 文档与现状一致
+
+- `AGENTS.md`、`README.md` 必须与代码一致：依赖、目录、入口、构建/发版方式、
+  平台限制、断点等改了就要同步（例如新增依赖必须更新 README 的依赖表）。
+- 有 `CHANGELOG.md` 时补对应版本条目；发版说明（tag 信息、Release notes）
+  与应用版本一致，写用户能看懂的变更，不照抄 commit。
+- 检查引用的文件路径、命令、环境变量是否仍然存在且可执行。
+
+### 3. 脱敏检查
+
+提交内容不得包含：
+
+- token、密码、私钥、证书、签名文件、`.env` 内容；
+- 个人绝对路径（如 `/Users/<name>`）、内网地址、未公开仓库或服务地址；
+- 真实设备序列号、账号、手机号等个人信息。
+
+示例值一律用占位符（`<repo-url>`、`/path/to/...`）。
+
+### 4. 面向未知开发环境
+
+其他开发者/CI 的环境是未知的，文档与脚本不能假设：
+
+- 不假设 Flutter、Dart、Xcode、系统版本或安装路径；用 mise 或文档中写明的
+  方式激活环境，版本要求写进 README / workflow。
+- 路径用相对路径、`$HOME` 或命令推导，不写死本机目录。
+- 依赖网络时说明镜像、代理与失败表现（如 `ghostty_dart` 的预编译下载、
+  GitHub API 限流）。
+- 构建与发版步骤要能在本地和 CI 复现，不依赖某台机器上的全局配置。
+
+### 5. 提交与版本
+
+- 按模块拆分提交，信息用 `feat/fix/chore/docs/test/ci` 前缀，说明"做了什么、
+  为什么"。
+- 发版必须同时修改 `pubspec.yaml` 的 `version`（构建号 `+N` 递增）并打
+  `vX.Y.Z` tag；CI 会校验两者一致。
