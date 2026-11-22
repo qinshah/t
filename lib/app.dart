@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/terminal/screens/terminal_screen.dart';
 
+/// 根 Navigator，供没有 [BuildContext] 的入口（如 macOS 应用菜单）打开对话框。
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 /// 应用根组件。
 ///
 /// 终端区域由 ghostty_dart_flutter 自绘，其余界面使用 Material 组件。
@@ -17,6 +20,7 @@ class TerminalApp extends StatelessWidget {
       builder: (context, settings, _) {
         return MaterialApp(
           title: 't',
+          navigatorKey: rootNavigatorKey,
           debugShowCheckedModeBanner: false,
           theme: _buildTheme(Brightness.light),
           darkTheme: _buildTheme(Brightness.dark),

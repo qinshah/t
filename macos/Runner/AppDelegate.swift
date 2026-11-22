@@ -3,7 +3,7 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
-  /// 与 Flutter 侧约定的菜单通道，事件由 `TerminalScreen` 处理。
+  /// 与 Flutter 侧约定的菜单通道，事件由 `lib/app_menu.dart` 分发。
   private static let appMenuChannelName = "com.ivi.t/app_menu"
 
   private var appMenuChannel: FlutterMethodChannel?
@@ -32,11 +32,8 @@ class AppDelegate: FlutterAppDelegate {
     }
   }
 
-  /// 响应应用菜单里的 “Settings…”（⌘,）。
-  ///
-  /// 菜单项的目标是 First Responder，经响应链最终落到这里，再通过
-  /// method channel 交给 Flutter 打开设置对话框。
-  @objc func showSettingsWindow(_ sender: Any?) {
+  /// 把 macOS 菜单事件转发给 Flutter。
+  private func sendAppMenu(_ method: String, arguments: Any? = nil) {
     guard let controller = NSApp.windows
       .compactMap({ $0.contentViewController as? FlutterViewController })
       .first else { return }
@@ -46,7 +43,29 @@ class AppDelegate: FlutterAppDelegate {
       binaryMessenger: controller.engine.binaryMessenger
     )
     appMenuChannel = channel
-    channel.invokeMethod("openSettings", arguments: nil)
+    channel.invokeMethod(method, arguments: arguments)
+  }
+
+  /// 响应应用菜单里的 “Settings…”（⌘,）。
+  ///
+  /// 菜单项的目标是 First Responder，经响应链最终落到这里，再通过
+  /// method channel 交给 Flutter 打开设置对话框。
+  @objc func showSettingsWindow(_ sender: Any?) {
+    sendAppMenu("openSettings")
+  }
+
+  /// 响应应用菜单里的 “About…”。
+  ///
+  /// 不能用系统的 `orderFrontStandardAboutPanel:`：它会新建原生窗口，
+  /// 触发 Flutter 引擎 `enableMultiView` 的断言崩溃，所以改为在 Flutter
+  /// 内展示“关于”对话框。
+  @objc func showAppAbout(_ sender: Any?) {
+    let info = Bundle.main.infoDictionary ?? [:]
+    sendAppMenu("openAbout", arguments: [
+      "name": info["CFBundleName"] as? String ?? "t",
+      "version": info["CFBundleShortVersionString"] as? String ?? "",
+      "copyright": info["NSHumanReadableCopyright"] as? String ?? "",
+    ])
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

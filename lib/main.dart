@@ -7,6 +7,7 @@ import 'package:ghostty_dart_flutter/ghostty_dart_flutter.dart'
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'app_menu.dart';
 import 'features/settings/models/setting.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/settings/services/settings_store.dart';
@@ -21,6 +22,9 @@ Future<void> main() async {
   final store = SettingsStore();
   await store.load();
   Setting.store = store;
+
+  // macOS 菜单（About / Settings…）走同一个 channel，窗口建好后即可响应。
+  bindAppMenuChannel();
 
   runApp(
     ChangeNotifierProvider<SettingsProvider>.value(

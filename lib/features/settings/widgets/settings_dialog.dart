@@ -17,9 +17,16 @@ import '../providers/settings_provider.dart';
 /// `Multiview can only be enabled before adding any view controllers` 崩溃。
 /// [DialogRoute] 仍然是普通路由，渲染在同一个窗口内。
 Future<T?> showSettingsDialog<T>(BuildContext context) {
-  return Navigator.of(context, rootNavigator: true).push<T>(
+  return showSettingsDialogOn<T>(Navigator.of(context, rootNavigator: true));
+}
+
+/// 通过根 [NavigatorState] 打开设置对话框。
+///
+/// 供没有 [BuildContext] 的入口（如 macOS 应用菜单）使用。
+Future<T?> showSettingsDialogOn<T>(NavigatorState navigator) {
+  return navigator.push<T>(
     DialogRoute<T>(
-      context: context,
+      context: navigator.overlay!.context,
       builder: (context) => const _ResponsiveSettingsDialog(),
     ),
   );
