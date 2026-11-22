@@ -45,8 +45,9 @@
 - **Dart**: 随 Flutter 安装
 
 `ghostty_dart_flutter` 要求 `flutter >= 3.47.0`，低于该版本的 SDK 无法解析依赖。
-CI 的 Flutter 版本固定在 `.github/workflows/release.yml`，必须满足
-`pubspec.yaml` 的 `environment.sdk`（当前 `^3.13.5` → Flutter 3.50.1）。
+CI 的 Flutter 版本固定在 `.github/workflows/release.yml`，优先与本地
+`mise` 版本对齐（本地 `oh-3.47.7` → CI `3.47.7`），并满足
+`pubspec.yaml` 的 `environment.sdk`（当前 `^3.13.5`）。
 
 ### 环境激活
 
