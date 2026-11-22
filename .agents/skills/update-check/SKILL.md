@@ -30,7 +30,9 @@ description: t 项目（Flutter）的应用内检查更新功能：启动时静�
   弹出结果提示。
 - 下载：按当前平台在 Release assets 里找第一个匹配项，用
   `url_launcher` 的 `LaunchMode.externalApplication` 在系统浏览器打开：
-  - Android：`.apk`
+  - Android：按 `device_info_plus` 读到的 `supportedAbis` 匹配
+    `.apk` 文件名中的 `arm64-v8a` / `x86_64`；旧 Release 没有拆分时退回
+    第一个 `.apk`
   - macOS：`.zip` 且文件名含 `macos`
   - Windows：`.zip` 且文件名含 `windows`
   - Linux：`.zip` 且文件名含 `linux`
@@ -45,8 +47,11 @@ description: t 项目（Flutter）的应用内检查更新功能：启动时静�
   `Multiview can only be enabled before adding any view controllers` 崩溃
   （与 `settings_dialog.dart` 的约定一致）。
 - 换仓库只改 `UpdateService.repository`。
-- 修改 Release 产物命名时同步更新 `_pickDownloadUrl` 与
-  [release skill](../release/SKILL.md) 的命名约定。
+- 修改 Release 产物命名时同步更新 `pickDownloadUrl` 与
+  [release skill](../release/SKILL.md) 的命名约定；Android 产物是
+  `t-vX.Y.Z-android-<abi>.apk`，`abi` 只有 `arm64-v8a` / `x86_64`。
+- Android release 清单必须声明 `android.permission.INTERNET`，否则正式包
+  无法请求 GitHub API（debug/profile 清单自带，但 release 不会合并进来）。
 - GitHub API 需要 `User-Agent` 请求头，接口限流 60 次/小时/IP；不要把检查
   放到高频路径。
 - `/releases/latest` 不返回 draft 或 prerelease：发版后必须把草稿 Release
@@ -57,7 +62,8 @@ description: t 项目（Flutter）的应用内检查更新功能：启动时静�
 
 ```bash
 flutter analyze
-flutter test test/features/settings
+flutter test test/features/update test/features/settings
 ```
 
-改动版本比较或资产匹配时，优先补不依赖网络的单元测试（`compareVersions`）。
+改动版本比较或资产匹配时，优先补不依赖网络的单元测试（`compareVersions`、
+`pickDownloadUrl`）。

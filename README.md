@@ -21,8 +21,8 @@ Ghostty 的终端引擎）负责解析与渲染，**flutter_pty_new** 负责本�
 
 - macOS 12 或更高（工程部署目标为 12.0）。
 - Flutter 3.47 或更高（`ghostty_dart_flutter` 要求 `flutter >= 3.47.0`、
-  `sdk ^3.13.5`；本机使用 mise 管理的 oh-3.47.7 版本，CI 使用对齐的官方
-  3.47.7 stable，Dart 3.13.5）。
+  `sdk ^3.13.5`；本机使用 mise 管理的 oh-3.47.7，CI 取同一 minor 的最新
+  patch：官方 3.47.9 stable，Dart 3.13.7）。
 - Xcode 命令行工具（构建 macOS 目标需要）。
 - 首次 `flutter pub get` / 构建需要网络：`ghostty_dart` 的 build hook 会下载
   按 sha256 固定的预编译 libghostty-vt 动态库。
@@ -62,7 +62,9 @@ flutter build macos      # 生产构建
   当前平台的安装包，没有匹配资产时打开 Release 页面。
 - 发版：修改 `pubspec.yaml` 的 `version` → 提交 → 打 `vX.Y.Z` tag → 推送。
   [release.yml](.github/workflows/release.yml) 会构建 Android APK、Windows
-  zip、macOS zip 并创建草稿 Release。
+  zip、macOS zip 并创建草稿 Release。Android 使用
+  `flutter build apk --release --split-per-abi`，只产出 `arm64-v8a` 与
+  `x86_64` 两个安装包，应用按设备 ABI 选择下载。
 - tag 必须与 pubspec 版本一致（CI 的 `prepare` job 会校验）；草稿 Release
   转为正式版后应用才能检查到：
   `gh release edit vX.Y.Z --draft=false --latest`。
@@ -78,6 +80,7 @@ flutter build macos      # 生产构建
 | `ghostty_dart` | 同上（`dependency_overrides` 锁定） | libghostty-vt 的 Dart 绑定 |
 | `http` | pub.dev `^1.6.0` | 请求 GitHub Release API |
 | `package_info_plus` | pub.dev `^10.2.2` | 读取应用版本号 |
+| `device_info_plus` | pub.dev `^13.3.0` | 读取 Android ABI，选择对应 APK |
 | `url_launcher` | pub.dev `^6.3.3` | 用系统浏览器打开下载链接 |
 
 `ghostty_dart_flutter` 的 pubspec 把 `ghostty_dart` 声明为托管依赖，直接再加
@@ -88,6 +91,11 @@ path 依赖会与它冲突；因此根 `pubspec.yaml` 用 `dependency_overrides`
 
 - **macOS 沙箱已关闭**（`macos/Runner/*.entitlements`）：开启 App Sandbox 时
   `forkpty` 出来的 Shell 会立刻退出（exit 255、无输出），终端不可用。
+- **Android release 清单声明了 `INTERNET`**：检查更新需要访问 GitHub API。
+  debug / profile 清单自带的 `INTERNET` 不会合并进 release，新增网络功能时
+  要记得在 `android/app/src/main/AndroidManifest.xml` 声明。
+- **Android 只打 64 位包**：`abiFilters` 限定 `arm64-v8a` 与 `x86_64`，
+  构建使用 `--split-per-abi`，Release 里没有 armeabi-v7a 安装包。
 - **macOS 部署目标为 12.0**：`macos/Podfile` 的 `platform :osx, '12.0'` 与
   Xcode 工程一致；改这个值前先确认 Xcode 支持的最低版本。
 - **macOS 启动时会把工作目录切到 app bundle 的 `Contents/Frameworks`**：

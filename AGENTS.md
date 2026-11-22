@@ -45,8 +45,8 @@
 - **Dart**: 随 Flutter 安装
 
 `ghostty_dart_flutter` 要求 `flutter >= 3.47.0`，低于该版本的 SDK 无法解析依赖。
-CI 的 Flutter 版本固定在 `.github/workflows/release.yml`，优先与本地
-`mise` 版本对齐（本地 `oh-3.47.7` → CI `3.47.7`），并满足
+CI 的 Flutter 版本固定在 `.github/workflows/release.yml`，取与本地 mise
+版本同一 minor 的最新 patch（本地 `oh-3.47.7` → CI `3.47.9`），并满足
 `pubspec.yaml` 的 `environment.sdk`（当前 `^3.13.5`）。
 
 ### 环境激活
@@ -184,7 +184,8 @@ dart pub create -t package [package_name]
 - **其他依赖：** `panes ^1.6.0`（宽屏可拖侧边栏）、`path_provider ^2.1.6`
   （偏好文件位置）、`provider ^6.1.5`（偏好状态）、`http ^1.6.0`（GitHub
   Release API）、`package_info_plus ^10.2.2`（读应用版本）、
-  `url_launcher ^6.3.3`（系统浏览器打开下载链接）
+  `url_launcher ^6.3.3`（系统浏览器打开下载链接）、
+  `device_info_plus ^13.3.0`（读取 Android ABI，选择对应 APK）
 - **范围：** 应用只提供终端功能，不内置 MCP 服务、driver 入口或调试脚本
 
 ### 响应式布局
@@ -259,9 +260,14 @@ dart pub create -t package [package_name]
   语义化版本比较（忽略 `v` 前缀与 `+build`）。
 - 启动检查在 `TerminalApp.initState` 的首帧回调；设置里的「检查更新」是手动
   入口。对话框必须用 `DialogRoute`，不能用 `showDialog`（macOS 会崩）。
-- 下载按平台匹配 Release 资产命名（`t-vX.Y.Z-android.apk` /
+- 下载按平台匹配 Release 资产命名（Android 为
+  `t-vX.Y.Z-android-<abi>.apk`，`abi` 只有 `arm64-v8a` / `x86_64`；桌面为
   `-windows.zip` / `-macos.zip`），用系统浏览器打开；没有匹配资产时打开
-  Release 页面。
+  Release 页面。Android 通过 `device_info_plus` 读取设备 ABI。
+- Android 构建固定 `flutter build apk --release --split-per-abi`，
+  `android/app/build.gradle.kts` 的 `abiFilters` 只保留上述两个 ABI。
+- release 清单必须声明 `android.permission.INTERNET`，debug/profile 清单里的
+  声明不会合并进正式包。
 - 发版由 `.github/workflows/release.yml` 驱动：推送 `vX.Y.Z` tag 触发构建。
   tag 必须与 `pubspec.yaml` 的 `version` 一致（CI 会校验），草稿 Release
   发布后应用才能检查到。

@@ -17,28 +17,35 @@ description: t 项目（Flutter 多标签终端）的发版流程：修改 pubsp
 - `pubspec.yaml` 的 `version: 0.1.0+1` → tag 必须是 `v0.1.0`（`+1` 为构建号，不参与比较）。
 - workflow 的 `prepare` job 会校验两者，不一致直接失败。
 
-## 关键约定：action 的 Flutter 版本优先对齐本地
+## 关键约定：action 的 Flutter 版本取本地同 minor 的最新 patch
 
-改 workflow 或升级依赖前，先读本地环境，再把同一个版本填进 action：
+先读本地版本，再查同一 `major.minor` 下的最新 patch 填进 action：
 
 ```bash
 mise current                              # 例如 flutter oh-3.47.7
 flutter --version                         # 确认 Flutter / Dart 版本
 sed -n '/^environment:/,/^[^ ]/p' pubspec.yaml   # sdk 约束，当前 ^3.13.5
+
+# 查 3.47.x 的最新官方 stable
+curl -s https://storage.googleapis.com/flutter_infra_release/releases/releases_macos.json \
+  | python3 -c 'import json,sys; v={r["version"] for r in json.load(sys.stdin)["releases"]}; print(max((x for x in v if x.startswith("3.47.")), key=lambda x: tuple(map(int, x.split(".")))))'
 ```
 
-- 本地版本去掉 `oh-` 前缀就是 action 用的官方版本：本地 `oh-3.47.7` →
-  `FLUTTER_VERSION: "3.47.7"`。本地能编过，CI 就优先用这个版本。
+- 本地 `oh-3.47.7` → 取 `3.47.x` 最新版（当前 **3.47.9**），而不是固定在
+  3.47.7。本地 `oh-3.47.1` 同理取 `3.47.x` 最新。
 - 不要主动跳到 3.50 等新大版本，除非本地已经升级并验证过。
 - 确认该版本自带 Dart 满足 `environment.sdk` 与 `ghostty_dart_flutter` 的
   `flutter >= 3.47.0`，取较高者：
   - 3.47.3 / 3.47.4 → Dart 3.13.3（**不满足** `^3.13.5`）
-  - 3.47.6 / 3.47.7 → Dart 3.13.5（满足，当前固定 **3.47.7**）
+  - 3.47.6 / 3.47.7 → Dart 3.13.5；3.47.9 → Dart 3.13.7（满足，当前固定
+    **3.47.9**）
 - 只升 Flutter、不要为了过 CI 调低 pubspec 的 SDK 约束。
 - Android 的 AGP 跟随本地已验证配置（当前 `9.1.0`）；只有 CI 明确报最低版本
   不足时才升级，并在本地重新验证。
 - 升级 Flutter 版本后先本地 `flutter pub get`、`flutter analyze`、
   `flutter test`，再发版。
+- Android 只打 64 位包：`android/app/build.gradle.kts` 的 `abiFilters` 限定
+  `arm64-v8a` / `x86_64`，构建命令必须带 `--split-per-abi`。
 
 ## 发版步骤
 
@@ -98,14 +105,25 @@ gh run watch <id> --repo qinshah/t --exit-status
 gh run view <id> --repo qinshah/t --log-failed   # 失败时
 ```
 
-构建 job：`android`（APK）、`windows`（zip）、`macos`（zip），三者都成功后
-`release` job 创建草稿。产物命名（应用内按此匹配平台，不要随意改名）：
+构建 job：`android`（按 ABI 拆分的 APK）、`windows`（zip）、`macos`（zip），
+三者都成功后 `release` job 创建草稿。产物命名（应用内按此匹配平台与 ABI，
+不要随意改名）：
 
 ```
-t-v0.2.0-android.apk
+t-v0.2.0-android-arm64-v8a.apk
+t-v0.2.0-android-x86_64.apk
 t-v0.2.0-windows.zip
 t-v0.2.0-macos.zip
 ```
+
+Android 构建命令固定为：
+
+```bash
+flutter build apk --release --split-per-abi
+```
+
+只产出 `arm64-v8a` 与 `x86_64`，不要改回单 APK；应用检查更新时会按设备
+ABI 选择对应安装包。
 
 ### 6. 发布 Release（草稿 → 正式）
 
@@ -119,14 +137,14 @@ gh release list --repo qinshah/t --limit 3
 ## 版本不匹配排查
 
 - **`Because t requires SDK version ^X, version solving failed`**：CI 的
-  Flutter 自带 Dart 低于 pubspec 要求。优先把 `FLUTTER_VERSION` 对齐本地
-  已验证版本（本地 `oh-3.47.7` → `3.47.7`），不要直接跳到新大版本。
+  Flutter 自带 Dart 低于 pubspec 要求。把 `FLUTTER_VERSION` 改成与本地同
+  minor 的最新 patch（本地 `oh-3.47.7` → `3.47.9`），不要直接跳到新大版本。
 - **`Android Gradle Plugin version X is lower than Flutter's minimum supported
   version Y`**：按错误提示升级 `android/settings.gradle.kts` 的
   `com.android.application`，并在本地重新构建验证；Flutter 版本回退到本地
   已验证版本时，AGP 也一并回退。
 - 改完重新提交、重新打 tag 触发构建；本地可先跑
-  `flutter build apk --release` 验证。
+  `flutter build apk --release --split-per-abi` 验证。
 
 ## 注意事项
 
@@ -134,7 +152,7 @@ gh release list --repo qinshah/t --limit 3
 - CI 用 `submodules: recursive` 拉取 `third/ghostty_dart`，子模块改动需先推到
   `qinshah/ghostty_dart`。
 - `PUB_HOSTED_URL` 固定为 `https://pub.flutter-io.cn`，与 `pubspec.lock` 生成环境一致。
-- Flutter 版本固定在 workflow 的 `FLUTTER_VERSION`（当前 3.47.7，与本地
-  `oh-3.47.7` 对齐），必须满足 `pubspec.yaml` 的 `sdk ^3.13.5` 与
-  `ghostty_dart_flutter` 的 `flutter >= 3.47.0`。
+- Flutter 版本固定在 workflow 的 `FLUTTER_VERSION`（当前 3.47.9，取本地
+  `oh-3.47.7` 同一 minor 的最新 patch），必须满足 `pubspec.yaml` 的
+  `sdk ^3.13.5` 与 `ghostty_dart_flutter` 的 `flutter >= 3.47.0`。
 - 只有正式（非 draft、非 prerelease）Release 会被应用内检查更新看到。
