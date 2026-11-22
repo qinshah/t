@@ -1,33 +1,17 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:t/features/settings/models/app_preferences.dart';
+import 'package:t/features/settings/models/setting.dart';
 import 'package:t/features/settings/providers/settings_provider.dart';
-import 'package:t/features/settings/services/preferences_store.dart';
+import 'package:t/features/settings/services/settings_store.dart';
 import 'package:t/features/settings/widgets/settings_dialog.dart';
-
-/// 不落盘的存储实现。
-///
-/// 组件测试运行在 FakeAsync 区域，真实文件 I/O 的 Future 不会推进；
-/// 这里覆写 [save] 让设置修改只留在内存里。
-class _NoopPreferencesStore extends PreferencesStore {
-  _NoopPreferencesStore()
-    : super(directoryProvider: () async => Directory.systemTemp);
-
-  @override
-  Future<void> save(AppPreferences preferences) async {}
-}
 
 void main() {
   late SettingsProvider settings;
 
   setUp(() {
-    settings = SettingsProvider(
-      store: _NoopPreferencesStore(),
-      initial: const AppPreferences(),
-    );
+    Setting.store = SettingsStore.memory();
+    settings = SettingsProvider();
   });
 
   tearDown(() {
@@ -57,18 +41,22 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('宽屏使用不占满的对话框，并展示两个配置项', (tester) async {
+  testWidgets('宽屏使用不占满的对话框，并展示三个配置项', (tester) async {
     await tester.pumpWidget(host());
     await openDialog(tester);
 
-    expect(find.text('颜色模式'), findsOneWidget);
-    expect(find.text('终端配色'), findsOneWidget);
-    expect(find.text('终端深浅'), findsOneWidget);
+    expect(find.text('深色模式'), findsOneWidget);
+    expect(find.text('终端深色模式'), findsOneWidget);
+    expect(find.text('自动退出'), findsOneWidget);
+    expect(find.text('终端配色'), findsNothing);
     expect(find.byType(Dialog), findsOneWidget);
-    // 宽屏对话框有最大尺寸约束，不是 fullscreen 的零内边距。
+    // 宽屏对话框有最大尺寸约束，不是零内边距。
     expect(tester.widget<Dialog>(find.byType(Dialog)).insetPadding, isNull);
     // 默认值下没有恢复按钮。
     expect(find.byTooltip('恢复默认'), findsNothing);
+    expect(find.text('自动'), findsNWidgets(2));
+    expect(find.text('暗色'), findsNWidgets(2));
+    expect(find.text('亮色'), findsNWidgets(2));
   });
 
   testWidgets('窄屏去掉内边距铺满窗口', (tester) async {
@@ -85,8 +73,8 @@ void main() {
     final shape = dialog.shape;
     expect(shape, isA<RoundedRectangleBorder>());
     expect((shape as RoundedRectangleBorder).borderRadius, BorderRadius.zero);
-    expect(find.text('颜色模式'), findsOneWidget);
-    expect(find.text('终端深浅'), findsOneWidget);
+    expect(find.text('深色模式'), findsOneWidget);
+    expect(find.text('终端深色模式'), findsOneWidget);
   });
 
   testWidgets('对话框打开后跨过断点会实时切换形态', (tester) async {
@@ -110,7 +98,7 @@ void main() {
       (narrowShape as RoundedRectangleBorder).borderRadius,
       BorderRadius.zero,
     );
-    expect(find.text('终端深浅'), findsOneWidget);
+    expect(find.text('终端深色模式'), findsOneWidget);
 
     // 再拉宽，应该恢复成不占满、带默认圆角的对话框。
     tester.view.physicalSize = const Size(1200, 800);
@@ -124,20 +112,36 @@ void main() {
     await tester.pumpWidget(host());
     await openDialog(tester);
 
-    // 颜色模式行在第一位，两个分段控件都含「深色」，这里点第一处。
-    await tester.tap(find.text('深色').first);
+    // 第一行是界面深色模式；两个分段控件都含「暗色」，这里点第一处。
+    await tester.tap(find.text('暗色').first);
     await tester.pumpAndSettle();
-    expect(settings.colorMode, AppColorMode.dark);
+    expect(settings.themeMode, ThemeMode.dark);
     expect(find.byTooltip('恢复默认'), findsOneWidget);
 
-    settings.setTerminalBrightness(TerminalBrightness.light);
+    settings.setTerminalThemeMode(ThemeMode.light);
     await tester.pump();
     expect(find.byTooltip('恢复默认'), findsNWidgets(2));
 
     await tester.tap(find.byTooltip('恢复默认').first);
     await tester.pumpAndSettle();
-    expect(settings.colorMode, AppColorMode.auto);
-    expect(settings.terminalBrightness, TerminalBrightness.light);
+    expect(settings.themeMode, ThemeMode.system);
+    expect(settings.terminalThemeMode, ThemeMode.light);
     expect(find.byTooltip('恢复默认'), findsOneWidget);
+  });
+
+  testWidgets('自动退出开关可修改并恢复默认', (tester) async {
+    await tester.pumpWidget(host());
+    await openDialog(tester);
+    expect(settings.quitWhenLastClosed, isTrue);
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    expect(settings.quitWhenLastClosed, isFalse);
+    expect(find.byTooltip('恢复默认'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('恢复默认'));
+    await tester.pumpAndSettle();
+    expect(settings.quitWhenLastClosed, isTrue);
+    expect(find.byTooltip('恢复默认'), findsNothing);
   });
 }

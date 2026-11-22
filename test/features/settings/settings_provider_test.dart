@@ -1,35 +1,27 @@
-import 'dart:io';
 import 'dart:ui' show Brightness;
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:t/features/settings/models/app_preferences.dart';
+import 'package:t/features/settings/models/setting.dart';
 import 'package:t/features/settings/models/solarized_themes.dart';
 import 'package:t/features/settings/providers/settings_provider.dart';
-import 'package:t/features/settings/services/preferences_store.dart';
+import 'package:t/features/settings/services/settings_store.dart';
 
 void main() {
-  late Directory directory;
-  late PreferencesStore store;
   late SettingsProvider settings;
 
-  setUp(() async {
-    directory = await Directory.systemTemp.createTemp('t_settings_provider');
-    store = PreferencesStore(directoryProvider: () async => directory);
-    settings = SettingsProvider(store: store, initial: const AppPreferences());
+  setUp(() {
+    Setting.store = SettingsStore.memory();
+    settings = SettingsProvider();
   });
 
-  tearDown(() async {
-    // 先等异步落盘结束，再删临时目录，避免删除与写入竞争。
-    await store.flush();
+  tearDown(() {
     settings.dispose();
-    if (await directory.exists()) {
-      await directory.delete(recursive: true);
-    }
   });
 
   group('SettingsProvider.terminalThemeFor', () {
-    test('默认「随颜色」跟随应用主题亮度', () {
-      expect(settings.terminalBrightness, TerminalBrightness.followColorMode);
+    test('默认自动跟随应用主题亮度', () {
+      expect(settings.terminalThemeMode, ThemeMode.system);
       expect(settings.terminalThemeFor(Brightness.dark), SolarizedThemes.dark);
       expect(
         settings.terminalThemeFor(Brightness.light),
@@ -37,24 +29,45 @@ void main() {
       );
     });
 
-    test('深色 / 浅色强制覆盖应用亮度', () {
-      settings.setTerminalBrightness(TerminalBrightness.dark);
+    test('暗色 / 亮色强制覆盖应用亮度', () {
+      settings.setTerminalThemeMode(ThemeMode.dark);
       expect(settings.terminalThemeFor(Brightness.light), SolarizedThemes.dark);
 
-      settings.setTerminalBrightness(TerminalBrightness.light);
+      settings.setTerminalThemeMode(ThemeMode.light);
       expect(settings.terminalThemeFor(Brightness.dark), SolarizedThemes.light);
     });
 
     test('恢复默认后重新跟随应用主题', () {
-      settings.setTerminalBrightness(TerminalBrightness.dark);
-      expect(settings.isTerminalBrightnessDefault, isFalse);
+      settings.setTerminalThemeMode(ThemeMode.dark);
+      expect(settings.isTerminalThemeModeDefault, isFalse);
 
-      settings.resetTerminalBrightness();
-      expect(settings.isTerminalBrightnessDefault, isTrue);
+      settings.resetTerminalThemeMode();
+      expect(settings.isTerminalThemeModeDefault, isTrue);
       expect(
         settings.terminalThemeFor(Brightness.light),
         SolarizedThemes.light,
       );
+    });
+  });
+
+  group('SettingsProvider 其他偏好', () {
+    test('界面模式映射 ThemeMode', () {
+      expect(settings.themeMode, ThemeMode.system);
+      settings.setThemeMode(ThemeMode.dark);
+      expect(settings.themeMode, ThemeMode.dark);
+      expect(settings.isThemeModeDefault, isFalse);
+    });
+
+    test('自动退出默认开启，可修改与恢复', () {
+      expect(settings.quitWhenLastClosed, isTrue);
+
+      settings.setQuitWhenLastClosed(false);
+      expect(settings.quitWhenLastClosed, isFalse);
+      expect(settings.isQuitWhenLastClosedDefault, isFalse);
+
+      settings.resetQuitWhenLastClosed();
+      expect(settings.quitWhenLastClosed, isTrue);
+      expect(settings.isQuitWhenLastClosedDefault, isTrue);
     });
   });
 }

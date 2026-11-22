@@ -7,8 +7,9 @@ import 'package:ghostty_dart_flutter/ghostty_dart_flutter.dart'
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'features/settings/models/setting.dart';
 import 'features/settings/providers/settings_provider.dart';
-import 'features/settings/services/preferences_store.dart';
+import 'features/settings/services/settings_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,13 +17,14 @@ Future<void> main() async {
   // Kitty 图形协议的 PNG 解码是进程级钩子，启动时装一次即可。
   setVtPngDecoder(decodeVtPng);
 
-  // 先读完偏好再建界面，避免首帧先闪默认主题再跳变。
-  final store = PreferencesStore();
-  final settings = SettingsProvider(store: store, initial: await store.load());
+  // 先把偏好读进内存，再建界面；Setting.get 是同步读取，不会闪默认主题。
+  final store = SettingsStore();
+  await store.load();
+  Setting.store = store;
 
   runApp(
     ChangeNotifierProvider<SettingsProvider>.value(
-      value: settings,
+      value: SettingsProvider(),
       child: const TerminalApp(),
     ),
   );

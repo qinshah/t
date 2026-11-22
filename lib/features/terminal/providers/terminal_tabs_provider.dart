@@ -28,6 +28,7 @@ class TerminalTabsProvider extends ChangeNotifier {
   TerminalTabsProvider({
     TerminalSessionFactory? createSession,
     VtTerminalTheme theme = VtTerminalTheme.defaultTheme,
+    this.onLastTabClosed,
   }) : _createSession =
            createSession ??
            ((theme) async => LocalPtySession.create(theme: theme)),
@@ -36,6 +37,9 @@ class TerminalTabsProvider extends ChangeNotifier {
   final TerminalSessionFactory _createSession;
   final List<TerminalTab> _tabs = <TerminalTab>[];
   VtTerminalTheme _terminalTheme;
+
+  /// 最后一个标签被关闭后的回调；用于按偏好自动退出应用。
+  final VoidCallback? onLastTabClosed;
 
   String? _activeId;
   int _counter = 0;
@@ -128,7 +132,11 @@ class TerminalTabsProvider extends ChangeNotifier {
     }
     notifyListeners();
     _disposeSessionAfterFrame(removed.session);
-    _focusActiveAfterFrame();
+    if (_tabs.isEmpty) {
+      onLastTabClosed?.call();
+    } else {
+      _focusActiveAfterFrame();
+    }
   }
 
   /// 把焦点交给当前激活标签的终端。

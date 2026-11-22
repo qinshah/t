@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app_breakpoints.dart';
-import '../models/app_preferences.dart';
+import '../models/setting.dart';
 import '../providers/settings_provider.dart';
 
 /// 打开设置对话框。
@@ -91,83 +91,34 @@ class _SettingsBody extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
                     _PreferenceTile(
-                      title: '颜色模式',
-                      subtitle: '自动跟随系统亮度，也可以固定为深色或浅色界面。',
-                      modified: !settings.isColorModeDefault,
-                      onReset: settings.resetColorMode,
-                      control: CupertinoSlidingSegmentedControl<AppColorMode>(
-                        groupValue: settings.colorMode,
-                        onValueChanged: (value) {
-                          if (value != null) settings.setColorMode(value);
-                        },
-                        children: {
-                          for (final mode in AppColorMode.values)
-                            mode: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              child: Text(
-                                mode.label,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                        },
+                      title: '深色模式',
+                      subtitle: '自动跟随系统；暗色 / 亮色固定界面深浅。',
+                      modified: !settings.isThemeModeDefault,
+                      onReset: settings.resetThemeMode,
+                      control: _themeModeControl(
+                        settings.themeMode,
+                        settings.setThemeMode,
                       ),
                     ),
                     _PreferenceTile(
-                      title: '终端配色',
-                      subtitle: 'Solarized 色板；深浅由下一项单独控制。',
-                      modified: !settings.isTerminalPaletteDefault,
-                      onReset: settings.resetTerminalPalette,
-                      control: DropdownMenu<TerminalPalette>(
-                        // 外部恢复默认时用 key 强制重建，保证选中项同步。
-                        key: ValueKey(settings.terminalPalette),
-                        width: 180,
-                        initialSelection: settings.terminalPalette,
-                        requestFocusOnTap: false,
-                        dropdownMenuEntries: [
-                          for (final palette in TerminalPalette.values)
-                            DropdownMenuEntry<TerminalPalette>(
-                              value: palette,
-                              label: palette.label,
-                            ),
-                        ],
-                        onSelected: (value) {
-                          if (value != null) {
-                            settings.setTerminalPalette(value);
-                          }
-                        },
+                      title: '终端深色模式',
+                      subtitle: '自动时跟随应用主题深浅；也可单独固定为暗色或亮色。',
+                      modified: !settings.isTerminalThemeModeDefault,
+                      onReset: settings.resetTerminalThemeMode,
+                      control: _themeModeControl(
+                        settings.terminalThemeMode,
+                        settings.setTerminalThemeMode,
                       ),
                     ),
                     _PreferenceTile(
-                      title: '终端深浅',
-                      subtitle: '随颜色时跟随当前应用主题的深浅色。',
-                      modified: !settings.isTerminalBrightnessDefault,
-                      onReset: settings.resetTerminalBrightness,
-                      control:
-                          CupertinoSlidingSegmentedControl<TerminalBrightness>(
-                            groupValue: settings.terminalBrightness,
-                            onValueChanged: (value) {
-                              if (value != null) {
-                                settings.setTerminalBrightness(value);
-                              }
-                            },
-                            children: {
-                              for (final brightness
-                                  in TerminalBrightness.values)
-                                brightness: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  child: Text(
-                                    brightness.label,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                            },
-                          ),
+                      title: '自动退出',
+                      subtitle: '关闭最后一个终端后自动退出应用。',
+                      modified: !settings.isQuitWhenLastClosedDefault,
+                      onReset: settings.resetQuitWhenLastClosed,
+                      control: Switch(
+                        value: settings.quitWhenLastClosed,
+                        onChanged: settings.setQuitWhenLastClosed,
+                      ),
                     ),
                   ],
                 ),
@@ -178,6 +129,23 @@ class _SettingsBody extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 自动 / 暗色 / 亮色三段选择器；两个深浅设置共用。
+Widget _themeModeControl(ThemeMode value, ValueChanged<ThemeMode> onChanged) {
+  return CupertinoSlidingSegmentedControl<ThemeMode>(
+    groupValue: value,
+    onValueChanged: (next) {
+      if (next != null) onChanged(next);
+    },
+    children: {
+      for (final mode in ThemeMode.values)
+        mode: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Text(mode.label, style: const TextStyle(fontSize: 12)),
+        ),
+    },
+  );
 }
 
 /// 单个设置项：标题行右侧是恢复按钮与控件，下一行是简介。
