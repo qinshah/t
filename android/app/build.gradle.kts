@@ -27,6 +27,11 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        ndk {
+            // 只打 64 位包：真机 arm64-v8a，模拟器 x86_64。
+            abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
+        }
     }
 
     buildTypes {

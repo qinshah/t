@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -36,9 +37,27 @@ class UpdateService {
       currentVersion: packageInfo.version,
       latestTag: tag,
       releaseUrl: release['html_url'] as String? ?? _latestPage,
-      downloadUrl: assets is List ? pickDownloadUrl(assets) : null,
+      downloadUrl: assets is List
+          ? pickDownloadUrl(assets, androidAbi: await _androidAbi())
+          : null,
       notes: (release['body'] as String? ?? '').trim(),
     );
+  }
+
+  /// Android 设备优先使用的 ABI；其他平台返回 `null`。
+  ///
+  /// Release 里的 APK 按 ABI 拆分（仅 arm64-v8a / x86_64），需要按设备选对包。
+  static Future<String?> _androidAbi() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
+    try {
+      final abis = (await DeviceInfoPlugin().androidInfo).supportedAbis;
+      for (final abi in const ['arm64-v8a', 'x86_64']) {
+        if (abis.contains(abi)) return abi;
+      }
+    } catch (error) {
+      debugPrint('读取 Android ABI 失败: $error');
+    }
+    return null;
   }
 
   /// 请求 `releases/latest`；404 表示还没有发布过正式 Release。
@@ -65,15 +84,28 @@ class UpdateService {
 
   /// 按平台挑安装包；命名规则见 `.github/workflows/release.yml`。
   ///
-  /// [platform] 仅供测试注入；默认取 [defaultTargetPlatform]。
+  /// [platform] 与 [androidAbi] 仅供测试注入。
   static String? pickDownloadUrl(
     List<dynamic> assets, {
     TargetPlatform? platform,
+    String? androidAbi,
   }) {
     if (kIsWeb) return null;
 
-    final matches = switch (platform ?? defaultTargetPlatform) {
-      TargetPlatform.android => (String name) => name.endsWith('.apk'),
+    final target = platform ?? defaultTargetPlatform;
+    if (target == TargetPlatform.android) {
+      // 优先匹配当前 ABI；旧 Release 没有拆分时退回第一个 apk。
+      if (androidAbi != null) {
+        final byAbi = _findUrl(
+          assets,
+          (name) => name.endsWith('.apk') && name.contains(androidAbi),
+        );
+        if (byAbi != null) return byAbi;
+      }
+      return _findUrl(assets, (name) => name.endsWith('.apk'));
+    }
+
+    final matches = switch (target) {
       TargetPlatform.windows => (
         String name,
       ) => name.endsWith('.zip') && name.contains('windows'),
@@ -86,7 +118,13 @@ class UpdateService {
       _ => null,
     };
     if (matches == null) return null;
+    return _findUrl(assets, matches);
+  }
 
+  static String? _findUrl(
+    List<dynamic> assets,
+    bool Function(String name) matches,
+  ) {
     for (final asset in assets) {
       if (asset is! Map) continue;
       final name = asset['name'];

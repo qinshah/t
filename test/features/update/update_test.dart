@@ -56,8 +56,12 @@ void main() {
   group('pickDownloadUrl', () {
     const assets = [
       {
-        'name': 't-v0.2.0-android.apk',
-        'browser_download_url': 'https://example.com/android.apk',
+        'name': 't-v0.2.0-android-arm64-v8a.apk',
+        'browser_download_url': 'https://example.com/android-arm64.apk',
+      },
+      {
+        'name': 't-v0.2.0-android-x86_64.apk',
+        'browser_download_url': 'https://example.com/android-x86_64.apk',
       },
       {
         'name': 't-v0.2.0-windows.zip',
@@ -77,10 +81,53 @@ void main() {
       },
     ];
 
-    test('Android 选 apk', () {
+    test('Android 按设备 ABI 选拆分后的 apk', () {
+      expect(
+        UpdateService.pickDownloadUrl(
+          assets,
+          platform: TargetPlatform.android,
+          androidAbi: 'arm64-v8a',
+        ),
+        'https://example.com/android-arm64.apk',
+      );
+      expect(
+        UpdateService.pickDownloadUrl(
+          assets,
+          platform: TargetPlatform.android,
+          androidAbi: 'x86_64',
+        ),
+        'https://example.com/android-x86_64.apk',
+      );
+    });
+
+    test('未知 ABI 时退回第一个 apk', () {
       expect(
         UpdateService.pickDownloadUrl(assets, platform: TargetPlatform.android),
-        'https://example.com/android.apk',
+        'https://example.com/android-arm64.apk',
+      );
+      expect(
+        UpdateService.pickDownloadUrl(
+          assets,
+          platform: TargetPlatform.android,
+          androidAbi: 'armeabi-v7a',
+        ),
+        'https://example.com/android-arm64.apk',
+      );
+    });
+
+    test('旧 Release 未拆分 ABI 时仍能匹配 apk', () {
+      expect(
+        UpdateService.pickDownloadUrl(
+          const [
+            {
+              'name': 't-v0.1.0-android.apk',
+              'browser_download_url': 'https://example.com/legacy.apk',
+            },
+          ],
+          platform: TargetPlatform.android,
+          androidAbi: 'arm64-v8a',
+        ),
+        'https://example.com/legacy.apk',
       );
     });
 

@@ -1,12 +1,13 @@
 name: t
 description: "A Flutter multi-tab terminal built on libghostty-vt."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   sdk: ^3.13.5
 
 dependencies:
+  device_info_plus: ^13.3.0
   flutter:
     sdk: flutter
   flutter_pty_new: ^1.0.0
