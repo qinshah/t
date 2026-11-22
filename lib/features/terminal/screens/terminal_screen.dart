@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:panes/panes.dart';
 import 'package:provider/provider.dart';
 
@@ -39,8 +40,16 @@ class TerminalScreen extends StatefulWidget {
 }
 
 class _TerminalScreenState extends State<TerminalScreen> {
+  /// macOS 应用菜单（“Settings…” / ⌘,）事件通道，见 `macos/Runner/AppDelegate.swift`。
+  static const MethodChannel _appMenuChannel = MethodChannel(
+    'com.ivi.t/app_menu',
+  );
+
   late final SettingsProvider _settings;
   late final TerminalTabsProvider _provider;
+
+  /// 设置对话框是否已打开；菜单快捷键可重复触发，避免叠加多层。
+  bool _settingsOpen = false;
 
   /// 宽屏侧边栏与内容区的分栏控制器；窄屏时不渲染但保留宽度状态。
   late final PaneController _panes;
@@ -73,8 +82,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
       ],
     );
     _settings.addListener(_syncTerminalTheme);
+    _appMenuChannel.setMethodCallHandler(_handleAppMenuCall);
     // 启动即创建首个标签；焦点由 provider 在标签建好后授予。
     unawaited(_provider.createTab());
+  }
+
+  /// 处理 macOS 原生菜单事件。
+  Future<void> _handleAppMenuCall(MethodCall call) async {
+    if (call.method == 'openSettings') _openSettings();
   }
 
   @override
@@ -88,6 +103,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   @override
   void dispose() {
+    _appMenuChannel.setMethodCallHandler(null);
     _settings.removeListener(_syncTerminalTheme);
     _panes.dispose();
     _provider.dispose();
@@ -105,7 +121,13 @@ class _TerminalScreenState extends State<TerminalScreen> {
   }
 
   void _openSettings() {
-    unawaited(showSettingsDialog<void>(context));
+    if (_settingsOpen) return;
+    _settingsOpen = true;
+    unawaited(
+      showSettingsDialog<void>(
+        context,
+      ).whenComplete(() => _settingsOpen = false),
+    );
   }
 
   @override

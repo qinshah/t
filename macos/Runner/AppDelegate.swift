@@ -3,6 +3,11 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  /// 与 Flutter 侧约定的菜单通道，事件由 `TerminalScreen` 处理。
+  private static let appMenuChannelName = "com.ivi.t/app_menu"
+
+  private var appMenuChannel: FlutterMethodChannel?
+
   override func applicationWillFinishLaunching(_ notification: Notification) {
     super.applicationWillFinishLaunching(notification)
 
@@ -15,6 +20,33 @@ class AppDelegate: FlutterAppDelegate {
     if defaults.object(forKey: "ApplePressAndHoldEnabled") as? Bool != false {
       defaults.set(false, forKey: "ApplePressAndHoldEnabled")
     }
+  }
+
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    super.applicationDidFinishLaunching(notification)
+
+    // macOS 13 起系统把 “Preferences…” 更名为 “Settings…”。
+    if #available(macOS 13.0, *),
+       let appMenu = NSApp.mainMenu?.items.first?.submenu {
+      appMenu.item(withTitle: "Preferences…")?.title = "Settings…"
+    }
+  }
+
+  /// 响应应用菜单里的 “Settings…”（⌘,）。
+  ///
+  /// 菜单项的目标是 First Responder，经响应链最终落到这里，再通过
+  /// method channel 交给 Flutter 打开设置对话框。
+  @objc func showSettingsWindow(_ sender: Any?) {
+    guard let controller = NSApp.windows
+      .compactMap({ $0.contentViewController as? FlutterViewController })
+      .first else { return }
+
+    let channel = appMenuChannel ?? FlutterMethodChannel(
+      name: Self.appMenuChannelName,
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    appMenuChannel = channel
+    channel.invokeMethod("openSettings", arguments: nil)
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
