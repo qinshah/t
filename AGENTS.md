@@ -190,8 +190,10 @@ dart pub create -t package [package_name]
   侧边栏初始 264，可拖动范围 200–420。
 - 宽屏：`MultiPane`（`panes` 包）常驻侧边栏 + 内容区，分隔条可拖动；
   窄屏：AppBar 抽屉 + 内容区。
-- 右上角操作在两种布局保持一致：宽屏在侧边栏头部右侧，窄屏在 AppBar
-  `actions`，顺序都是「新建终端 → 设置」；侧边栏底部不再有独立新建按钮。
+- 侧边栏宽屏常驻与窄屏抽屉直接复用同一个 `TerminalSidebar`，不区分变体；
+  侧边栏内部通过是否位于 `Drawer` 中决定操作后是否收起抽屉。
+- 右上角操作：侧边栏头部（两种布局都有）与窄屏 AppBar `actions` 都提供
+  「新建终端 → 设置」，顺序一致。
 - 设置对话框按同一断点决定形态：两种形态都是普通 `Dialog` 覆盖层，
   不使用 `Dialog.fullscreen`（会触发系统级全屏）。宽屏保留默认
   `insetPadding` 并限制内容最大 520×560；窄屏 `insetPadding: EdgeInsets.zero`
@@ -203,24 +205,32 @@ dart pub create -t package [package_name]
 ### 偏好设置
 
 - 偏好文件：`getApplicationSupportDirectory()/preferences.json`，由
-  `PreferencesStore` 读写；读写失败一律回退默认值，不得影响启动。
-- 默认值集中在 `AppDefaults`（`lib/features/settings/models/
-  app_preferences.dart`）的静态属性。新增配置项必须同时：
-  1. 在 `AppDefaults` 提供 `static const` 默认值；
-  2. 在设置对话框用 `_PreferenceTile` 展示，并在偏离默认值时显示
-     「恢复默认」按钮；
-  3. 在 `AppPreferences` 的 `toJson` / `fromJson` 中做容错解析。
+  `SettingsStore`（`lib/features/settings/services/settings_store.dart`）
+  读入内存 Map 后异步落盘；读写失败一律回退默认值，不得影响启动。
+- 偏好项用 `Setting<Value, Data>` 静态实例声明
+  （`lib/features/settings/models/setting.dart`，参考 flutter_bili 的
+  `settings_s.dart`）：`get()` 同步读当前值，`set()` 在值等于默认值时
+  直接删除存储项，`isDefault` 供设置页判断是否显示「恢复默认」。
+- 持久化 JSON 只存基本类型（`String` / `bool` / `num`），key 是
+  `SettingEnum.name`；复杂值用 `enCoder` / `deCoder` 转换，不要存序列化
+  对象或颜色值。当前只有 `themeMode`、`terminalThemeMode`、
+  `quitWhenLastClosed` 三项。
+- 新增配置项必须：
+  1. 在 `SettingEnum` 增加名称与标题；
+  2. 增加 `Setting` 静态实例并给 `defValue`；
+  3. 在 `SettingsProvider` 暴露 getter / setter / reset / `isXxxDefault`；
+  4. 在设置对话框用 `_PreferenceTile` 展示。
 - 设置项布局：标题行是「标题 + 恢复按钮 + 控件」，下一行是简介。
-  颜色模式与终端深浅用 `CupertinoSlidingSegmentedControl`，终端配色用
-  `DropdownMenu`。
-- 终端配色预设在 `lib/features/settings/models/solarized_themes.dart`，
-  只描述色板（当前 Solarized）；深浅是独立配置项
-  `TerminalBrightness`（随颜色 / 深色 / 浅色），由
-  `SettingsProvider.terminalThemeFor(appBrightness)` 解析；「随颜色」
-  跟随 `Theme.of(context).brightness`（应用主题解析后的实际深浅），
-  不是裸的系统亮度。切换时通过 `ITerminalSession.applyTheme` →
-  `VtTerminalController.theme` 热更新，不重建会话。
-- 颜色模式映射到 `MaterialApp.themeMode`；浅色与深色两套 `ThemeData`
+  两个深浅项用 `CupertinoSlidingSegmentedControl`，选项直接复用 SDK
+  `ThemeMode`，标签统一翻译为「自动 / 暗色 / 亮色」；开关项用 `Switch`。
+- 终端配色没有偏好项：色板硬编码在
+  `lib/features/settings/models/solarized_themes.dart`，只按
+  `terminalThemeMode` 与 `Theme.of(context).brightness` 取明/暗两套。
+  切换时通过 `ITerminalSession.applyTheme` → `VtTerminalController.theme`
+  热更新，不重建会话。
+- 「自动退出」默认开启；关闭最后一个标签会调用
+  `TerminalTabsProvider.onLastTabClosed` 并退出应用。
+- 界面深浅映射到 `MaterialApp.themeMode`；浅色与深色两套 `ThemeData`
   都要维护，不要在页面里硬编码背景色。
 
 ### TERM 与颜色

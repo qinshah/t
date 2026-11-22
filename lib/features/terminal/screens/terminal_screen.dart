@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:panes/panes.dart';
@@ -55,6 +56,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
     _provider = TerminalTabsProvider(
       createSession: widget.createSession,
       theme: _settings.terminalThemeFor(_appBrightness),
+      // 关闭最后一个终端后，按偏好决定是否退出应用。
+      onLastTabClosed: () {
+        if (_settings.quitWhenLastClosed) exit(0);
+      },
     );
     _panes = PaneController(
       entries: [
@@ -114,19 +119,22 @@ class _TerminalScreenState extends State<TerminalScreen> {
     );
   }
 
+  /// 宽屏与抽屉共用的同一个侧边栏实例配置。
+  Widget _buildSidebar() {
+    return TerminalSidebar(
+      provider: _provider,
+      onTabSelected: _provider.selectTab,
+      onOpenSettings: _openSettings,
+    );
+  }
+
   Widget _buildWide(BuildContext context) {
     return Scaffold(
       body: MultiPane(
         direction: Axis.horizontal,
         controller: _panes,
         paneBuilder: (context, id, animationProgress) => switch (id) {
-          'sidebar' => TerminalSidebar(
-            provider: _provider,
-            showHeaderActions: true,
-            onTabSelected: _provider.selectTab,
-            onNewTab: _createTab,
-            onOpenSettings: _openSettings,
-          ),
+          'sidebar' => _buildSidebar(),
           _ => _Workspace(provider: _provider),
         },
       ),
@@ -150,16 +158,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
           ),
         ],
       ),
-      drawer: Drawer(
-        width: _sidebarInitialWidth,
-        child: TerminalSidebar(
-          provider: _provider,
-          onTabSelected: (id) {
-            _provider.selectTab(id);
-            Navigator.of(context).pop();
-          },
-        ),
-      ),
+      drawer: Drawer(width: _sidebarInitialWidth, child: _buildSidebar()),
       body: _Workspace(provider: _provider),
     );
   }
