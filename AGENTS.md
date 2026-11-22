@@ -173,20 +173,61 @@ dart pub create -t package [package_name]
 
 ## 项目依赖与约定
 
-- **状态管理：** 原生 `ChangeNotifier` + `ListenableBuilder`，不引入 provider
+- **状态管理：** 标签状态用原生 `ChangeNotifier` + `ListenableBuilder`；
+  应用级偏好用 `provider` 的 `ChangeNotifierProvider<SettingsProvider>` 管理
 - **UI：** Material 3（`useMaterial3: true`），不使用 Hux
 - **终端引擎：** `third/ghostty_dart` 子模块（`ghostty_dart` + `ghostty_dart_flutter`）
 - **PTY：** pub.dev 上的 `flutter_pty_new ^1.0.0`
+- **其他依赖：** `panes ^1.6.0`（宽屏可拖侧边栏）、`path_provider ^2.1.6`
+  （偏好文件位置）、`provider ^6.1.5`（偏好状态）
 - **范围：** 应用只提供终端功能，不内置 MCP 服务、driver 入口或调试脚本
 
 ### 响应式布局
 
-- 断点与尺寸集中在 `lib/features/terminal/screens/terminal_screen.dart`：
-  `_sidebarBreakpoint = 900`、`_sidebarWidth = 264`。
-- 宽屏：常驻侧边栏 + 内容区；窄屏：AppBar 抽屉 + 内容区。
+- 断点集中在 `lib/app_breakpoints.dart`：`wideLayoutBreakpoint = 560`
+  （常见手机逻辑宽度约 390–412 的 1.4 倍）。
+- 尺寸在 `lib/features/terminal/screens/terminal_screen.dart`：
+  侧边栏初始 264，可拖动范围 200–420。
+- 宽屏：`MultiPane`（`panes` 包）常驻侧边栏 + 内容区，分隔条可拖动；
+  窄屏：AppBar 抽屉 + 内容区。
+- 右上角操作在两种布局保持一致：宽屏在侧边栏头部右侧，窄屏在 AppBar
+  `actions`，顺序都是「新建终端 → 设置」；侧边栏底部不再有独立新建按钮。
+- 设置对话框按同一断点决定形态：两种形态都是普通 `Dialog` 覆盖层，
+  不使用 `Dialog.fullscreen`（会触发系统级全屏）。宽屏保留默认
+  `insetPadding` 并限制内容最大 520×560；窄屏 `insetPadding: EdgeInsets.zero`
+  铺满窗口。对话框打开期间跨过断点要实时切换。
 - 两种布局共享同一个 `TerminalTabsProvider`，改变窗口宽度不会重建会话。
 - 所有标签的 `TerminalPanel` 必须留在 widget 树中（`IndexedStack`），
   否则切换标签会丢会话状态。
+
+### 偏好设置
+
+- 偏好文件：`getApplicationSupportDirectory()/preferences.json`，由
+  `PreferencesStore` 读写；读写失败一律回退默认值，不得影响启动。
+- 默认值集中在 `AppDefaults`（`lib/features/settings/models/
+  app_preferences.dart`）的静态属性。新增配置项必须同时：
+  1. 在 `AppDefaults` 提供 `static const` 默认值；
+  2. 在设置对话框用 `_PreferenceTile` 展示，并在偏离默认值时显示
+     「恢复默认」按钮；
+  3. 在 `AppPreferences` 的 `toJson` / `fromJson` 中做容错解析。
+- 设置项布局：标题行是「标题 + 恢复按钮 + 控件」，下一行是简介。
+  颜色模式与终端深浅用 `CupertinoSlidingSegmentedControl`，终端配色用
+  `DropdownMenu`。
+- 终端配色预设在 `lib/features/settings/models/solarized_themes.dart`，
+  只描述色板（当前 Solarized）；深浅是独立配置项
+  `TerminalBrightness`（随颜色 / 深色 / 浅色），由
+  `SettingsProvider.terminalThemeFor(appBrightness)` 解析；「随颜色」
+  跟随 `Theme.of(context).brightness`（应用主题解析后的实际深浅），
+  不是裸的系统亮度。切换时通过 `ITerminalSession.applyTheme` →
+  `VtTerminalController.theme` 热更新，不重建会话。
+- 颜色模式映射到 `MaterialApp.themeMode`；浅色与深色两套 `ThemeData`
+  都要维护，不要在页面里硬编码背景色。
+
+### TERM 与颜色
+
+- `resolveShellSpec` 在父进程环境缺少非空 `TERM` 时注入
+  `xterm-256color`；已有值不覆盖。`flutter_pty_new` 内部也会兜底，
+  但应用层显式注入便于测试与替换 PTY 后端。
 
 ### 会话与标签的生命周期
 
