@@ -8,6 +8,7 @@ import '../../../app_breakpoints.dart';
 import '../../about/widgets/about_dialog.dart';
 import '../../terminal/providers/terminal_tabs_provider.dart';
 import '../../terminal/services/image_demo.dart';
+import '../../update/widgets/update_prompt.dart';
 import '../models/setting.dart';
 import '../providers/settings_provider.dart';
 
@@ -137,6 +138,18 @@ class _SettingsBody extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Column(
                         children: [
+                          TextButton(
+                            onPressed: () => unawaited(
+                              checkForUpdates(
+                                navigator: Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ),
+                                manual: true,
+                              ),
+                            ),
+                            child: const Text('检查更新'),
+                          ),
                           TextButton(
                             onPressed: () =>
                                 unawaited(_runImageRenderTest(context)),

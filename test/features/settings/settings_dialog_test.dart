@@ -49,6 +49,7 @@ void main() {
     expect(find.text('终端深色模式'), findsOneWidget);
     expect(find.text('自动退出'), findsOneWidget);
     expect(find.text('终端配色'), findsNothing);
+    expect(find.text('检查更新'), findsOneWidget);
     expect(find.text('图片渲染测试'), findsOneWidget);
     expect(find.text('关于 t'), findsOneWidget);
     expect(find.byType(Dialog), findsOneWidget);

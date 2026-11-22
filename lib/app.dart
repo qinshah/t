@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'features/settings/providers/settings_provider.dart';
 import 'features/terminal/providers/terminal_tabs_provider.dart';
 import 'features/terminal/screens/terminal_screen.dart';
+import 'features/update/widgets/update_prompt.dart';
 
 /// 根 Navigator，供没有 [BuildContext] 的入口（如 macOS 应用菜单）打开对话框。
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -36,6 +38,14 @@ class _TerminalAppState extends State<TerminalApp> {
         if (_settings.quitWhenLastClosed) exit(0);
       },
     );
+
+    // 启动时静默检查一次更新；失败不打扰用户，只有发现新版本才弹窗。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = rootNavigatorKey.currentState;
+      if (navigator != null) {
+        unawaited(checkForUpdates(navigator: navigator));
+      }
+    });
   }
 
   /// 应用主题解析后的亮度：固定深浅时取设置，自动时取系统亮度。
