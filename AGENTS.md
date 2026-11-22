@@ -164,6 +164,13 @@ dart pub create -t package [package_name]
    - 标签状态由 `TerminalTabsProvider`（`ChangeNotifier`）持有
    - 需要临时观察时可在 provider 的回调里加 `debugPrint`，排查完删除
 
+4. **光标动画回归：**
+   - 测试属于子模块：`packages/ghostty_dart_flutter/test/render/
+     terminal_render_test.dart`，覆盖 smoothstep 缓动、中途改目标、
+     隐藏光标与关闭缓动
+   - 可在 t 仓直接跑（使用 t 的包解析）：
+     `flutter test third/ghostty_dart/packages/ghostty_dart_flutter/test/render/terminal_render_test.dart --plain-name cursor`
+
 ## 项目依赖与约定
 
 - **状态管理：** 原生 `ChangeNotifier` + `ListenableBuilder`，不引入 provider
@@ -195,11 +202,20 @@ dart pub create -t package [package_name]
 
 - **不要修改子模块内容**。需要改引擎行为时先向上游提 issue/PR，或临时在本地
   实验后丢弃；提交前用 `git status` 确认子模块没有未提交改动。
-- **已知的本地兼容补丁（唯一一处）**：鸿蒙版 Flutter SDK 的 `TargetPlatform`
-  多出 `TargetPlatform.ohos`，`packages/ghostty_dart_flutter/lib/src/input/
-  keyboard/terminal_shortcuts.dart` 里穷尽的 switch 无法编译。已把非 Apple
-  分支改成通配符 `_`（归入 Linux/Windows 快捷键约定）。升级子模块后如果这处
-  改动被覆盖，需要重新打上，否则 `flutter build macos` 会失败。
+- **已知的本地改动（两处）**：
+  1. 鸿蒙版 Flutter SDK 的 `TargetPlatform` 多出 `TargetPlatform.ohos`，
+     `packages/ghostty_dart_flutter/lib/src/input/keyboard/
+     terminal_shortcuts.dart` 里穷尽的 switch 无法编译。已把非 Apple 分支改成
+     通配符 `_`（归入 Linux/Windows 快捷键约定）。
+  2. 光标动画与样式：`packages/ghostty_dart_flutter/lib/src/render/
+     terminal_render.dart` 与 `lib/src/view/terminal_view.dart` 增加
+     `cursorGlide` / `cursorGlideDuration`（默认 160ms、smoothstep vsync
+     Ticker）和 `barCursorThicknessFraction`（上游默认保持 1/8，t 应用传
+     1/5，避免改动上游 `cursor_bar.png` golden）。对应测试在
+     `test/render/terminal_render_test.dart`（含 `render_harness.dart`
+     的参数透传）。应用侧在 `TerminalPanel` 默认使用条状光标与 160ms。
+  升级子模块后如果这些改动被覆盖，需要重新打上，否则会分别导致
+  macOS 构建失败、光标动画与样式丢失。
 - 不要在子模块里执行 `git checkout` / `git restore` 覆盖上游代码。
 - 升级：`git submodule update --remote third/ghostty_dart`，然后
   `flutter pub get` 并重新验证（上游 API 可能变化）。
@@ -223,6 +239,15 @@ dart pub create -t package [package_name]
 
 ### 终端相关的行为约定
 
+- 光标默认是加粗的竖向条（`TerminalPanel.cursorStyle` 与
+  `barCursorThicknessFraction`），跨单元格移动由 `VtTerminalView` 的
+  `cursorGlide` / `cursorGlideDuration` 控制；改样式、粗细或时长只动
+  `TerminalPanel`，不要在页面里直接建 `VtTerminalView`。
+- 上游默认条状光标粗细是 1/8；不要在子模块里直接改默认值，否则会让
+  `cursor_bar.png` golden 失效。加粗只通过 `barCursorThicknessFraction`
+  在应用侧覆盖。
+- 光标缓动由渲染盒内的 vsync `Ticker` 驱动，flood 输出期间会自动关闭；不要
+  在应用层再叠加一套光标动画。
 - 输入输出一律走 `VtTerminalController`：输出用 `writeBytes`，输入转发
   `onOutput`；不要直接调用 `controller.terminal.write`。
 - `onResize(cols, rows, ...)` 与 `Pty.resize(rows, cols)` 参数顺序相反，

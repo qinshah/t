@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:ghostty_dart/ghostty_dart.dart' show VtCursorStyle;
 import 'package:ghostty_dart_flutter/ghostty_dart_flutter.dart';
 
 import '../services/terminal_session.dart';
@@ -8,10 +9,31 @@ import '../services/terminal_session.dart';
 /// 只按会话绑定控制器与焦点节点，不感知会话背后是本地 PTY 还是远程连接。
 class TerminalPanel extends StatelessWidget {
   /// 创建一个绑定到 [session] 的终端面板。
-  const TerminalPanel({super.key, required this.session});
+  ///
+  /// 光标默认使用竖向条并带 160ms 缓动；调用方可以按标签覆盖样式与时长。
+  const TerminalPanel({
+    super.key,
+    required this.session,
+    this.cursorStyle = VtCursorStyle.bar,
+    this.cursorGlide = true,
+    this.cursorGlideDuration = const Duration(milliseconds: 160),
+    this.barCursorThicknessFraction = 1 / 5,
+  });
 
   /// 面板要渲染的终端会话。
   final ITerminalSession session;
+
+  /// 覆盖程序通过 DECSCUSR 请求的光标形状。
+  final VtCursorStyle? cursorStyle;
+
+  /// 光标跨单元格移动时是否缓动。
+  final bool cursorGlide;
+
+  /// 光标缓动时长；`Duration.zero` 表示直接跳转。
+  final Duration cursorGlideDuration;
+
+  /// 条状光标的宽度占单元格宽度的比例；上游默认 1/8，这里默认更粗的 1/5。
+  final double barCursorThicknessFraction;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +49,10 @@ class TerminalPanel extends StatelessWidget {
         autofocus: false,
         textStyle: const TextStyle(fontSize: 13),
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        cursorStyle: cursorStyle,
+        cursorGlide: cursorGlide,
+        cursorGlideDuration: cursorGlideDuration,
+        barCursorThicknessFraction: barCursorThicknessFraction,
       ),
     );
   }

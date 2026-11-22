@@ -101,7 +101,7 @@ lib/
     ├── screens/
     │   └── terminal_screen.dart      # 断点式侧边栏 / 抽屉布局
     └── widgets/
-        ├── terminal_panel.dart       # VtTerminalView 封装
+        ├── terminal_panel.dart       # VtTerminalView 封装 + 光标配置
         └── terminal_sidebar.dart     # 标签列表与新建/关闭
 third/ghostty_dart/                   # git 子模块（终端引擎与 widget）
 ```
@@ -114,6 +114,27 @@ third/ghostty_dart/                   # git 子模块（终端引擎与 widget�
 - 粘贴：`Ctrl+Shift+V` / `Shift+Insert`，macOS 上 `Cmd+V`。
 - `Ctrl+V`、`Ctrl+A` 会原样发给 Shell（字面量与行首），不被终端截获。
 - 粘贴带换行且程序未开启 bracketed paste 时会被拦下（Ghostty 的粘贴保护）。
+
+## 光标
+
+- 默认使用更粗的竖向条光标（覆盖程序的 DECSCUSR 形状）。
+- 光标跨单元格移动时以 smoothstep 缓动滑过去，默认 160 ms；移动发生在
+  缓动中途时从当前绘制位置继续，不会跳回。
+- 光标隐藏、滚出视口或处于闪烁的“灭”半周期时仍会缓动到位；高吞吐输出
+  （flood）期间自动关闭缓动，保持刷帧节奏。
+- 条状光标宽度可配置：上游默认是单元格宽度的 1/8，本应用默认 1/5。
+- 在 [terminal_panel.dart](lib/features/terminal/widgets/terminal_panel.dart)
+  的 `TerminalPanel` 上配置：
+
+  ```dart
+  TerminalPanel(
+    session: session,
+    cursorStyle: VtCursorStyle.bar,               // 或 null 跟随程序
+    cursorGlide: true,
+    cursorGlideDuration: const Duration(milliseconds: 160),
+    barCursorThicknessFraction: 1 / 5,            // 上游默认 1/8
+  )
+  ```
 
 ## 已知限制
 
