@@ -62,7 +62,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
     );
     _settings.addListener(_syncTerminalTheme);
     // 启动即创建首个标签；焦点由 provider 在标签建好后授予。
-    unawaited(_provider.createTab());
+    // createTab 开头会同步 notifyListeners，initState 仍处于 build 阶段，
+    // 直接调用会触发 markNeedsBuild during build，因此推迟到首帧之后。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_provider.createTab());
+    });
   }
 
   @override
