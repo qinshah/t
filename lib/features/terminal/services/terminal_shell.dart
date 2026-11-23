@@ -65,6 +65,11 @@ ShellSpec _windowsShell(Map<String, String> env, _FsProbe fs) {
       _windowsHomeCandidates(env),
       requireAscii: true,
     ),
+    // flutter_pty_new 会用显式的 environment 调 CreateProcessW，自身只放
+    // TERM/LANG/PATH/HOME 等少量变量；Windows 子进程拿不到 SystemRoot、
+    // USERPROFILE、APPDATA 时，PowerShell 5.1 无法加载托管运行时
+    // （0x8009001d）。把父进程环境原样带上，等价于系统终端启动 shell。
+    environment: Map<String, String>.from(env),
   );
 }
 

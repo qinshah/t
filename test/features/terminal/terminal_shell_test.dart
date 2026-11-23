@@ -49,18 +49,22 @@ void main() {
       expect(spec.environment?['TERM'], 'xterm-256color');
     });
 
-    test('Windows 不注入 TERM', () {
+    test('Windows 继承父进程环境供 PowerShell 初始化', () {
       final spec = resolveShellSpec(
         operatingSystem: 'windows',
         environment: const {
           'COMSPEC': r'C:\Windows\System32\cmd.exe',
           'USERPROFILE': r'C:\Users\me',
+          'SystemRoot': r'C:\Windows',
+          'APPDATA': r'C:\Users\me\AppData\Roaming',
         },
         fileExists: (_) => true,
         directoryExists: (_) => true,
       );
 
-      expect(spec.environment, isNull);
+      expect(spec.environment, containsPair('SystemRoot', r'C:\Windows'));
+      expect(spec.environment, containsPair('APPDATA', r'C:\Users\me\AppData\Roaming'));
+      expect(spec.environment?['TERM'], isNull);
     });
   });
 }
