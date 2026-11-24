@@ -15,9 +15,11 @@ void main() {
   test('默认值', () {
     expect(Setting.themeMode.get(), ThemeMode.system);
     expect(Setting.terminalThemeMode.get(), ThemeMode.system);
+    expect(Setting.terminalFontSize.get(), defaultTerminalFontSize);
     expect(Setting.quitWhenLastClosed.get(), isTrue);
     expect(Setting.themeMode.isDefault, isTrue);
     expect(Setting.terminalThemeMode.isDefault, isTrue);
+    expect(Setting.terminalFontSize.isDefault, isTrue);
     expect(Setting.quitWhenLastClosed.isDefault, isTrue);
   });
 
@@ -54,6 +56,18 @@ void main() {
     await Setting.store.put('themeMode', 'unknown');
 
     expect(Setting.themeMode.get(), ThemeMode.system);
+  });
+
+  test('字号存数字，读取时取整；恢复默认删除存储项', () async {
+    await Setting.store.put('terminalFontSize', 20.0);
+    expect(Setting.terminalFontSize.get(), 20);
+
+    await Setting.terminalFontSize.set(24);
+    expect(Setting.store.get<num>('terminalFontSize'), 24);
+
+    await Setting.terminalFontSize.reset();
+    expect(Setting.store.get<num>('terminalFontSize'), isNull);
+    expect(Setting.terminalFontSize.get(), defaultTerminalFontSize);
   });
 
   test('标签翻译复用 ThemeMode', () {

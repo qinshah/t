@@ -124,6 +124,43 @@ class _SettingsBody extends StatelessWidget {
                       ),
                     ),
                     _PreferenceTile(
+                      title: '终端字号',
+                      subtitle:
+                          '范围 $minTerminalFontSize–$maxTerminalFontSize，默认 '
+                          '$defaultTerminalFontSize；Ctrl + 0 / - / =、'
+                          'Ctrl + 滚轮或双指缩放也可调整。',
+                      modified: !settings.isTerminalFontSizeDefault,
+                      onReset: settings.resetTerminalFontSize,
+                      control: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 140,
+                            child: Slider(
+                              value: settings.terminalFontSize.toDouble(),
+                              min: minTerminalFontSize.toDouble(),
+                              max: maxTerminalFontSize.toDouble(),
+                              divisions:
+                                  maxTerminalFontSize - minTerminalFontSize,
+                              label: '${settings.terminalFontSize}',
+                              onChanged: (value) =>
+                                  settings.setTerminalFontSize(value.round()),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 24,
+                            child: Text(
+                              '${settings.terminalFontSize}',
+                              textAlign: TextAlign.end,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _PreferenceTile(
                       title: '自动退出',
                       subtitle: '关闭最后一个终端后自动退出应用。',
                       modified: !settings.isQuitWhenLastClosedDefault,

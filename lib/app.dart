@@ -58,6 +58,8 @@ class _TerminalAppState extends State<TerminalApp> {
 
   @override
   void dispose() {
+    // 字号是延迟写入的，退出前补一次，避免丢掉最后几秒内的调整。
+    unawaited(_settings.flushTerminalFontSize());
     _tabs.dispose();
     super.dispose();
   }

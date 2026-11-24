@@ -2,6 +2,11 @@ import 'package:flutter/material.dart' show ThemeMode;
 
 import '../services/settings_store.dart';
 
+/// 终端字号：默认值、允许范围（4–64，步进 1）。
+const int defaultTerminalFontSize = 16;
+const int minTerminalFontSize = 4;
+const int maxTerminalFontSize = 64;
+
 /// 设置项分组，供设置页按分类展示。
 enum SettingCategory {
   def('默认'),
@@ -17,6 +22,7 @@ enum SettingCategory {
 enum SettingEnum {
   themeMode('深色模式', category: SettingCategory.appearance),
   terminalThemeMode('终端深色模式', category: SettingCategory.terminal),
+  terminalFontSize('终端字号', category: SettingCategory.terminal),
   quitWhenLastClosed('自动退出', category: SettingCategory.terminal);
 
   final String title;
@@ -88,6 +94,14 @@ class Setting<Value, Data> {
     defValue: ThemeMode.system,
     enCoder: (value) => value.name,
     deCoder: _themeModeFromName,
+  );
+
+  /// 终端字号（逻辑像素，整数）；设置页、Ctrl 快捷键与手势共用。
+  static final terminalFontSize = Setting<int, num>._(
+    SettingEnum.terminalFontSize,
+    defValue: defaultTerminalFontSize,
+    // JSON 里的整数可能被解码成 double，统一取整再使用。
+    deCoder: (value) => value.round(),
   );
 
   /// 关闭最后一个终端后是否退出应用。

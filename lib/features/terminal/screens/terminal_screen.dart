@@ -107,8 +107,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       child: ListenableBuilder(
         listenable: _provider,
         builder: (context, _) {
-          final wide =
-              MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
+          final wide = MediaQuery.sizeOf(context).width >= wideLayoutBreakpoint;
           return wide ? _buildWide(context) : _buildNarrow(context);
         },
       ),
@@ -170,6 +169,7 @@ class _Workspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final tabs = provider.tabs;
     if (tabs.isEmpty) return _EmptyState(provider: provider);
 
@@ -179,7 +179,15 @@ class _Workspace extends StatelessWidget {
       sizing: StackFit.expand,
       children: [
         for (final tab in tabs)
-          TerminalPanel(key: ValueKey(tab.id), session: tab.session),
+          TerminalPanel(
+            key: ValueKey(tab.id),
+            session: tab.session,
+            fontSize: settings.terminalFontSize,
+            onFontSizeChanged: settings.setTerminalFontSize,
+            onZoomIn: settings.zoomIn,
+            onZoomOut: settings.zoomOut,
+            onZoomReset: settings.resetTerminalFontSize,
+          ),
       ],
     );
   }

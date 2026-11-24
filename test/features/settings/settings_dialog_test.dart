@@ -47,6 +47,7 @@ void main() {
 
     expect(find.text('深色模式'), findsOneWidget);
     expect(find.text('终端深色模式'), findsOneWidget);
+    expect(find.text('终端字号'), findsOneWidget);
     expect(find.text('自动退出'), findsOneWidget);
     expect(find.text('终端配色'), findsNothing);
     expect(find.text('检查更新'), findsOneWidget);
@@ -130,6 +131,32 @@ void main() {
     expect(settings.themeMode, ThemeMode.system);
     expect(settings.terminalThemeMode, ThemeMode.light);
     expect(find.byTooltip('恢复默认'), findsOneWidget);
+  });
+
+  testWidgets('终端字号滑动条范围为 4–64，修改与恢复默认', (tester) async {
+    await tester.pumpWidget(host());
+    await openDialog(tester);
+
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.min, minTerminalFontSize.toDouble());
+    expect(slider.max, maxTerminalFontSize.toDouble());
+    expect(slider.value, defaultTerminalFontSize.toDouble());
+    expect(find.text('$defaultTerminalFontSize'), findsOneWidget);
+
+    settings.setTerminalFontSize(24);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 24);
+    expect(find.text('24'), findsOneWidget);
+    expect(find.byTooltip('恢复默认'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('恢复默认'));
+    await tester.pumpAndSettle();
+    expect(settings.terminalFontSize, defaultTerminalFontSize);
+    expect(find.text('$defaultTerminalFontSize'), findsOneWidget);
+    expect(find.byTooltip('恢复默认'), findsNothing);
+
+    // 清掉延迟写入的定时器，避免测试结束时还有 pending timer。
+    await settings.flushTerminalFontSize();
   });
 
   testWidgets('自动退出开关可修改并恢复默认', (tester) async {

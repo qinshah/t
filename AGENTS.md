@@ -219,8 +219,8 @@ dart pub create -t package [package_name]
   直接删除存储项，`isDefault` 供设置页判断是否显示「恢复默认」。
 - 持久化 JSON 只存基本类型（`String` / `bool` / `num`），key 是
   `SettingEnum.name`；复杂值用 `enCoder` / `deCoder` 转换，不要存序列化
-  对象或颜色值。当前只有 `themeMode`、`terminalThemeMode`、
-  `quitWhenLastClosed` 三项。
+  对象或颜色值。当前有 `themeMode`、`terminalThemeMode`、
+  `terminalFontSize`、`quitWhenLastClosed` 四项。
 - 新增配置项必须：
   1. 在 `SettingEnum` 增加名称与标题；
   2. 增加 `Setting` 静态实例并给 `defValue`；
@@ -228,7 +228,13 @@ dart pub create -t package [package_name]
   4. 在设置对话框用 `_PreferenceTile` 展示。
 - 设置项布局：标题行是「标题 + 恢复按钮 + 控件」，下一行是简介。
   两个深浅项用 `CupertinoSlidingSegmentedControl`，选项直接复用 SDK
-  `ThemeMode`，标签统一翻译为「自动 / 暗色 / 亮色」；开关项用 `Switch`。
+  `ThemeMode`，标签统一翻译为「自动 / 暗色 / 亮色」；开关项用 `Switch`；
+  终端字号用 4–64、步进 1 的 `Slider`。
+- 终端字号是运行中高频变化的偏好：`SettingsProvider` 立即更新内存值并
+  通知界面，写入磁盘用 5 秒防抖（每次修改重置 timer），应用退出前
+  `flushTerminalFontSize()` 补写。默认 16，范围 4–64（常量在
+  `setting.dart`），快捷键、Ctrl + 滚轮与触控缩放都走
+  `setTerminalFontSize` / `zoomIn` / `zoomOut` / `resetTerminalFontSize`。
 - 终端配色没有偏好项：色板硬编码在
   `lib/features/settings/models/solarized_themes.dart`，只按
   `terminalThemeMode` 与 `Theme.of(context).brightness` 取明/暗两套。
@@ -335,6 +341,10 @@ dart pub create -t package [package_name]
 - 不要在 `build` 里改 `controller.theme`；主题只在会话创建时设置。
 - 复制粘贴快捷键遵循 ghostty 约定（`Ctrl+V` / `Ctrl+A` 属于 Shell），
   不要用 `Shortcuts` 抢占这些组合。
+- 字号缩放由 `TerminalPanel` 统一处理：`Ctrl+0/-/=` 走 `VtTerminalView`
+  的 `onKeyEvent` 预处理，命中即 `handled`；Ctrl + 滚轮与双指/触控板缩放
+  在面板外层 `Listener` 上实现。按住 Ctrl 时用 `IgnorePointer` 屏蔽终端
+  指针事件，避免滚轮同时滚动回看缓冲；不要为此改子模块。
 
 ## 提交前规范（AI 开发）
 
